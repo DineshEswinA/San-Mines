@@ -1,12 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { getDistance } from '../utils/geo';
 import { requireAuth, authorizeRole } from '../middleware/auth';
-import tripsRouter from './trips';
+import { tripsRouter, configRouter } from './trips';
 
 const router = Router();
 
-// Mount trips router
+// Mount routers
 router.use('/trips', tripsRouter);
+router.use('/config', configRouter);
 
 /**
  * @route GET /health

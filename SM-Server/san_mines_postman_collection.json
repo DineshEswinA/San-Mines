@@ -1,0 +1,437 @@
+{
+  "info": {
+    "_postman_id": "e6a0d244-67fa-48ef-b4b6-455b99814421",
+    "name": "Sam Mines API Collection",
+    "description": "API collection for Sam Mines trip management, geofencing tracking, operator validation, and active configuration lookups.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "System & Utilities",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Retrieves system uptime and timestamp status check."
+          },
+          "response": []
+        },
+        {
+          "name": "Haversine Distance Calculator",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat1\": 40.7128,\n  \"lon1\": -74.0060,\n  \"lat2\": 34.0522,\n  \"lon2\": -118.2437\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/distance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "distance"
+              ]
+            },
+            "description": "Calculates the physical distance in meters between two GPS coordinates using the Haversine formula."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth & Profile",
+      "item": [
+        {
+          "name": "User Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profile"
+              ]
+            },
+            "description": "Retrieves user metadata for any authenticated token."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Portal Check",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin"
+              ]
+            },
+            "description": "Restricted check requiring token with 'admin' role privileges."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Configuration Lookups",
+      "item": [
+        {
+          "name": "Get Wheel Types",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/config/wheel-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "config",
+                "wheel-types"
+              ]
+            },
+            "description": "Returns all active rows from public.wheel_types to populate mobile list selections."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Materials",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/config/materials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "config",
+                "materials"
+              ]
+            },
+            "description": "Returns materials table lookup data (id, material_name, display_name)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Locations",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/config/locations?type=QUARRY",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "config",
+                "locations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "QUARRY",
+                  "description": "Optional: Filter by QUARRY or UNLOAD_SITE"
+                }
+              ]
+            },
+            "description": "Returns locations table data with optional query filters."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Trip Operations (Quarry Operator)",
+      "item": [
+        {
+          "name": "Post Check-in",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleNumber\": \"KA-01-ME-1234\",\n  \"transporterName\": \"VRL Logistics\",\n  \"quarryEntryTime\": \"\",\n  \"quarryEntryDate\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trips/checkin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trips",
+                "checkin"
+              ]
+            },
+            "description": "Initializes a checkin entry for a lorry. Status becomes 'INSIDE_QUARRY'. Accessible only to QUARRY_OPERATOR. Timestamps fall back to now if empty."
+          },
+          "response": []
+        },
+        {
+          "name": "Put Checkout",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transitType\": \"DIGITAL\",\n  \"govtStationaryNumber\": \"STATION123\",\n  \"dispatchLocationId\": 1,\n  \"materialId\": 1,\n  \"wheelTypeId\": 1,\n  \"netWeightTonne\": 25.5,\n  \"amountEntry\": 1500,\n  \"userLat\": 13.082700,\n  \"userLng\": 80.270700,\n  \"quarryExitTime\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trips/checkout/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trips",
+                "checkout",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Trip sequential ID"
+                }
+              ]
+            },
+            "description": "Performs checkout logic: conditional check for digital stationary numbers, dynamic geofencing lookup against public.locations using dispatchLocationId, and state update to 'IN_TRANSIT'. Accessible only to QUARRY_OPERATOR."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Trip Operations (Unload Operator)",
+      "item": [
+        {
+          "name": "Get Incoming Transit Logs",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trips/incoming",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trips",
+                "incoming"
+              ]
+            },
+            "description": "Fetches all active trips with status 'IN_TRANSIT'. Accessible only to UNLOAD_OPERATOR."
+          },
+          "response": []
+        },
+        {
+          "name": "Put Unload",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unloadingLocationId\": 3,\n  \"userLat\": 12.971600,\n  \"userLng\": 77.594600,\n  \"unloadEntryTime\": \"\",\n  \"unloadExitTime\": \"\",\n  \"unloadDate\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trips/unload/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trips",
+                "unload",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Trip sequential ID"
+                }
+              ]
+            },
+            "description": "Performs geofence check against public.locations(unloadingLocationId) and updates the status to 'UNLOADED' with unload operator credentials and time overrides. Accessible only to UNLOAD_OPERATOR."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "operatorToken",
+      "value": "mock-quarry-operator",
+      "type": "string",
+      "description": "Bearer token bypass value for local sandbox testing. Toggle to 'mock-unload-operator' depending on the role requirements."
+    }
+  ]
+}

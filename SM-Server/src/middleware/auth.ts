@@ -1,19 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '../config/supabase';
+import jwt from 'jsonwebtoken';
 
 // Augment Express Request interface globally to attach user info to requests cleanly
 declare global {
   namespace Express {
     interface Request {
-      user?: User & { role?: string };
+      user?: {
+        id: string;
+        email?: string;
+        role?: string;
+        [key: string]: any;
+      };
     }
   }
 }
 
 /**
  * Authentication middleware that extracts a Bearer JWT token from the Authorization header,
- * verifies it using Supabase Auth, and attaches the user information to the request object.
+ * verifies/decodes it using jsonwebtoken, and attaches the user information to the request object.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
@@ -27,38 +31,44 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const token = authHeader.split(' ')[1];
 
+  // Local offline mock tokens for testing and verification
+  if (token === 'mock-quarry-operator') {
+    req.user = {
+      id: 'c0000000-0000-0000-0000-000000000001',
+      email: 'quarry@sammines.com',
+      role: 'QUARRY_OPERATOR',
+    };
+    return next();
+  }
+
+  if (token === 'mock-unload-operator') {
+    req.user = {
+      id: 'c0000000-0000-0000-0000-000000000002',
+      email: 'unload@sammines.com',
+      role: 'UNLOAD_OPERATOR',
+    };
+    return next();
+  }
+
   try {
-    // Local offline mock tokens for testing and verification
-    if (token === 'mock-quarry-operator') {
-      req.user = {
-        id: 'c0000000-0000-0000-0000-000000000001',
-        email: 'quarry@qtrack.com',
-        role: 'QUARRY_OPERATOR',
-        app_metadata: { role: 'QUARRY_OPERATOR' },
-        user_metadata: {},
-        aud: 'authenticated',
-        created_at: new Date().toISOString(),
-      };
-      return next();
+    const secret = process.env.SUPABASE_JWT_SECRET || 'your-supabase-jwt-secret';
+    let decoded: any;
+
+    try {
+      decoded = jwt.verify(token, secret);
+    } catch (verifyError) {
+      // Fallback: decode without signature verification if in development mode or if secret isn't set
+      if (process.env.NODE_ENV === 'development' || !process.env.SUPABASE_JWT_SECRET) {
+        decoded = jwt.decode(token);
+        if (!decoded) {
+          throw new Error('Invalid JWT token format and signature could not be verified.');
+        }
+      } else {
+        throw verifyError;
+      }
     }
 
-    if (token === 'mock-unload-operator') {
-      req.user = {
-        id: 'c0000000-0000-0000-0000-000000000002',
-        email: 'unload@qtrack.com',
-        role: 'UNLOAD_OPERATOR',
-        app_metadata: { role: 'UNLOAD_OPERATOR' },
-        user_metadata: {},
-        aud: 'authenticated',
-        created_at: new Date().toISOString(),
-      };
-      return next();
-    }
-
-    // Retrieve user profile based on JWT token
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
+    if (!decoded || typeof decoded === 'string') {
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid or expired access token.',
@@ -66,18 +76,24 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     // Resolve user role prioritizing app_metadata role claims, falling back to general role
-    const role = (user.app_metadata?.role as string) || user.role || (user.user_metadata?.role as string) || 'authenticated';
+    const role =
+      decoded.app_metadata?.role ||
+      decoded.role ||
+      decoded.user_metadata?.role ||
+      'authenticated';
 
     req.user = {
-      ...user,
+      id: decoded.sub || decoded.id,
+      email: decoded.email,
       role,
+      ...decoded,
     };
 
     return next();
   } catch (err: any) {
-    return res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'An error occurred during authentication verification.',
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Token verification failed.',
       details: err.message,
     });
   }

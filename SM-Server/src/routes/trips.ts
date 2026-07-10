@@ -4,24 +4,12 @@ import { requireAuth, authorizeRole } from '../middleware/auth';
 import { supabase } from '../config/supabase';
 import { mapToClient } from '../utils/mapper';
 
-const router = Router();
-
-// Geofencing parameters loaded from environment variables with safe defaults
-const QUARRY_LAT = parseFloat(process.env.QUARRY_LAT || '40.7128');
-const QUARRY_LNG = parseFloat(process.env.QUARRY_LNG || '-74.0060');
-const UNLOAD_LAT = parseFloat(process.env.UNLOAD_LAT || '34.0522');
-const UNLOAD_LNG = parseFloat(process.env.UNLOAD_LNG || '-118.2437');
-const ALLOWED_RADIUS_METERS = parseFloat(process.env.ALLOWED_RADIUS_METERS || '100');
-
-// Database Schema Enums and Constraints for strict validation
-const ALLOWED_MATERIALS = ['river_sand', 'rough_gravel', 'pure_gravel', '10mm_road_metal', '20mm_road_metal', 'msand'];
-const ALLOWED_TYRES = [10, 12, 14, 16, 18];
+const tripsRouter = Router();
+const configRouter = Router();
 
 /**
  * Helper utility to verify if a user ID is a valid UUID and exists in the public.profiles database table.
- * Returns the validated UUID if it exists, otherwise returns null to prevent PostgreSQL foreign key constraint errors.
- *
- * @param userId Authenticated user's ID
+ * Returns the validated UUID if it exists, otherwise returns null to prevent PostgreSQL foreign key errors.
  */
 async function getValidProfileId(userId: string | undefined): Promise<string | null> {
   if (!userId) return null;
@@ -46,12 +34,108 @@ async function getValidProfileId(userId: string | undefined): Promise<string | n
   }
 }
 
+// ==========================================
+// 1. CONFIGURATION LOOKUPS (Authenticated Only)
+// ==========================================
+
+/**
+ * @route GET /api/config/wheel-types
+ * @desc Get all active wheel configuration types
+ */
+configRouter.get('/wheel-types', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('wheel_types')
+      .select('*')
+      .order('wheel_count', { ascending: true });
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to retrieve wheel types.',
+        details: error.message,
+      });
+    }
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to query configurations.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route GET /api/config/materials
+ * @desc Get all material types lookup list
+ */
+configRouter.get('/materials', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('materials')
+      .select('*')
+      .order('material_name', { ascending: true });
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to retrieve materials list.',
+        details: error.message,
+      });
+    }
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to query materials.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route GET /api/config/locations
+ * @desc Get list of locations with optional filter by ?type=QUARRY or ?type=UNLOAD_SITE
+ */
+configRouter.get('/locations', requireAuth, async (req: Request, res: Response) => {
+  const { type } = req.query;
+
+  try {
+    let query = supabase.from('locations').select('*');
+    if (type === 'QUARRY' || type === 'UNLOAD_SITE') {
+      query = query.eq('node_type', type);
+    }
+
+    const { data, error } = await query.order('name', { ascending: true });
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to retrieve locations.',
+        details: error.message,
+      });
+    }
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to query locations.',
+      details: err.message,
+    });
+  }
+});
+
+// ==========================================
+// 2. QUARRY OPERATIONS (QUARRY_OPERATOR Only)
+// ==========================================
+
 /**
  * @route POST /api/trips/checkin
- * @desc Initialize a checkin log (Accessible by QUARRY_OPERATOR only).
+ * @desc Initialize check-in logging for a vehicle arriving at a quarry
  */
-router.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (req: Request, res: Response) => {
-  const { vehicleNumber, transporterName, checkinTime } = req.body;
+tripsRouter.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (req: Request, res: Response) => {
+  const { vehicleNumber, transporterName, quarryEntryTime, quarryEntryDate } = req.body;
 
   if (!vehicleNumber || typeof vehicleNumber !== 'string' || vehicleNumber.trim() === '') {
     return res.status(400).json({
@@ -67,16 +151,21 @@ router.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (
     });
   }
 
-  // Fallback to runtime date/time if checkinTime is blank or omitted, but keep it editable if passed down
-  const resolvedCheckinTime =
-    checkinTime && typeof checkinTime === 'string' && checkinTime.trim() !== ''
-      ? checkinTime.trim()
-      : new Date().toISOString();
+  // Fallback to machine timestamps if missing from payload, keeping them editable if passed down
+  const now = new Date();
+  const resolvedEntryTime =
+    quarryEntryTime && typeof quarryEntryTime === 'string' && quarryEntryTime.trim() !== ''
+      ? quarryEntryTime.trim()
+      : now.toISOString();
+
+  const resolvedEntryDate =
+    quarryEntryDate && typeof quarryEntryDate === 'string' && quarryEntryDate.trim() !== ''
+      ? quarryEntryDate.trim()
+      : now.toISOString().split('T')[0];
 
   try {
     const operatorId = await getValidProfileId(req.user?.id);
 
-    // Insert record directly into the Supabase 'trips' table
     const { data, error } = await supabase
       .from('trips')
       .insert([
@@ -84,8 +173,8 @@ router.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (
           status: 'INSIDE_QUARRY',
           vehicle_number: vehicleNumber.trim(),
           transporter_name: transporterName.trim(),
-          quarry_entry_time: resolvedCheckinTime,
-          quarry_entry_date: resolvedCheckinTime.split('T')[0],
+          quarry_entry_time: resolvedEntryTime,
+          quarry_entry_date: resolvedEntryDate,
           quarry_operator_id: operatorId,
         },
       ])
@@ -102,7 +191,7 @@ router.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (
 
     return res.status(201).json({
       message: 'Check-in successful.',
-      id: data.id,
+      trip_id: data.id,
       trip: mapToClient(data),
     });
   } catch (err: any) {
@@ -116,14 +205,81 @@ router.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (
 
 /**
  * @route PUT /api/trips/checkout/:id
- * @desc Authorize checkout and flag as IN_TRANSIT (Accessible by QUARRY_OPERATOR only).
+ * @desc Authorize checkout, validate geofence at quarry location, and set status to 'IN_TRANSIT'
  */
-router.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (req: Request, res: Response) => {
+tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (req: Request, res: Response) => {
   const tripId = parseInt(req.params.id as string, 10);
   if (isNaN(tripId)) {
     return res.status(400).json({
       error: 'Bad Request',
       message: 'Invalid trip ID format.',
+    });
+  }
+
+  const {
+    transitType,
+    govtStationaryNumber,
+    dispatchLocationId,
+    materialId,
+    wheelTypeId,
+    netWeightTonne,
+    amountEntry,
+    userLat,
+    userLng,
+    quarryExitTime,
+  } = req.body;
+
+  // Initial validation
+  if (!transitType || (transitType !== 'DIGITAL' && transitType !== 'MANUAL')) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: "transitType must be 'DIGITAL' or 'MANUAL'.",
+    });
+  }
+
+  // RULE 1: Alphanumeric and presence verification if transitType is DIGITAL
+  if (transitType === 'DIGITAL') {
+    if (!govtStationaryNumber || typeof govtStationaryNumber !== 'string' || govtStationaryNumber.trim() === '') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'govtStationaryNumber is required and cannot be blank when transitType is DIGITAL.',
+      });
+    }
+
+    const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(govtStationaryNumber);
+    if (!isAlphanumeric) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'govtStationaryNumber must be strictly alphanumeric.',
+      });
+    }
+  }
+
+  if (!dispatchLocationId) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'dispatchLocationId is required.',
+    });
+  }
+
+  if (!materialId || !wheelTypeId) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'materialId and wheelTypeId are required.',
+    });
+  }
+
+  if (typeof netWeightTonne !== 'number' || netWeightTonne <= 0) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'netWeightTonne must be a positive number.',
+    });
+  }
+
+  if (typeof userLat !== 'number' || typeof userLng !== 'number') {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'userLat and userLng coordinates must be valid numbers.',
     });
   }
 
@@ -149,108 +305,58 @@ router.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR']), asy
       });
     }
 
-    const {
-      transitType,
-      govtStationaryNumber,
-      material,
-      lorryTyres,
-      netWeightTonne,
-      userLat,
-      userLng,
-      amountEntry,
-      checkoutTime,
-    } = req.body;
+    // 2. Fetch dispatch location to run Geofencing check
+    const { data: location, error: locError } = await supabase
+      .from('locations')
+      .select('latitude, longitude, allowed_radius_meters, node_type')
+      .eq('id', dispatchLocationId)
+      .single();
 
-    if (!transitType || (transitType !== 'DIGITAL' && transitType !== 'MANUAL')) {
+    if (locError || !location) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: "transitType must be 'DIGITAL' or 'MANUAL'.",
+        message: `Dispatch location with ID ${dispatchLocationId} not found.`,
       });
     }
 
-    // RULE A: Alphanumeric and presence verification for DIGITAL transit type
-    if (transitType === 'DIGITAL') {
-      if (!govtStationaryNumber || typeof govtStationaryNumber !== 'string' || govtStationaryNumber.trim() === '') {
-        return res.status(400).json({
-          error: 'Bad Request',
-          message: "govtStationaryNumber is required when transitType is 'DIGITAL'.",
-        });
-      }
-
-      const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(govtStationaryNumber);
-      if (!isAlphanumeric) {
-        return res.status(400).json({
-          error: 'Bad Request',
-          message: 'govtStationaryNumber must be strictly alphanumeric.',
-        });
-      }
-    }
-
-    // Validate material enum constraint
-    if (!material || typeof material !== 'string' || !ALLOWED_MATERIALS.includes(material)) {
+    if (location.node_type !== 'QUARRY') {
       return res.status(400).json({
         error: 'Bad Request',
-        message: `material must be one of the supported types: [${ALLOWED_MATERIALS.join(', ')}].`,
+        message: 'Selected dispatchLocationId is not designated as a QUARRY site.',
       });
     }
 
-    // Validate lorry_tyres check constraint
-    if (typeof lorryTyres !== 'number' || !ALLOWED_TYRES.includes(lorryTyres)) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: `lorryTyres must be one of the supported check constraints: [${ALLOWED_TYRES.join(', ')}].`,
-      });
-    }
+    // RULE 2: Geofence check using Haversine Formula
+    const distance = getDistance(userLat, userLng, parseFloat(location.latitude), parseFloat(location.longitude));
+    const allowedRadius = parseFloat(location.allowed_radius_meters || '100');
 
-    if (typeof netWeightTonne !== 'number' || netWeightTonne <= 0) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'netWeightTonne must be a positive number.',
-      });
-    }
-
-    if (typeof amountEntry !== 'number' || amountEntry < 0) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'amountEntry must be a valid number (>= 0).',
-      });
-    }
-
-    if (typeof userLat !== 'number' || typeof userLng !== 'number') {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'userLat and userLng coordinates must be valid numbers.',
-      });
-    }
-
-    // RULE B: Geofence validation against Quarry Constants
-    const distance = getDistance(userLat, userLng, QUARRY_LAT, QUARRY_LNG);
-    if (distance > ALLOWED_RADIUS_METERS) {
+    if (distance > allowedRadius) {
       return res.status(403).json({
         error: 'Forbidden',
-        message: `Geofence violation: Distance from quarry is ${distance.toFixed(2)}m, which exceeds the allowed radius of ${ALLOWED_RADIUS_METERS}m.`,
+        message: `Geofence violation: Distance from quarry is ${distance.toFixed(2)}m, which exceeds the allowed radius of ${allowedRadius}m.`,
       });
     }
 
-    const resolvedCheckoutTime =
-      checkoutTime && typeof checkoutTime === 'string' && checkoutTime.trim() !== ''
-        ? checkoutTime.trim()
+    const resolvedExitTime =
+      quarryExitTime && typeof quarryExitTime === 'string' && quarryExitTime.trim() !== ''
+        ? quarryExitTime.trim()
         : new Date().toISOString();
 
-    // 2. Perform database update
+    // 3. Save the updated checkout transaction details
     const { data: updatedTrip, error: updateError } = await supabase
       .from('trips')
       .update({
         status: 'IN_TRANSIT',
         transit_type: transitType,
-        govt_stationary_number: transitType === 'DIGITAL' ? govtStationaryNumber.trim() : (govtStationaryNumber?.trim() || null),
-        material,
-        lorry_tyres: lorryTyres,
+        govt_stationary_number: govtStationaryNumber ? govtStationaryNumber.trim() : null,
+        dispatch_location_id: dispatchLocationId,
+        material_id: materialId,
+        wheel_type_id: wheelTypeId,
         net_weight_tonne: netWeightTonne,
-        amount_entry: amountEntry,
+        amount_entry: amountEntry !== undefined ? amountEntry : null,
         quarry_gps_lat: userLat,
         quarry_gps_long: userLng,
-        quarry_exit_time: resolvedCheckoutTime,
+        quarry_exit_time: resolvedExitTime,
         updated_at: new Date().toISOString(),
       })
       .eq('id', tripId)
@@ -278,11 +384,15 @@ router.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR']), asy
   }
 });
 
+// ==========================================
+// 3. UNLOADING SITE OPERATIONS (UNLOAD_OPERATOR Only)
+// ==========================================
+
 /**
  * @route GET /api/trips/incoming
- * @desc Retrieve all logs where status is IN_TRANSIT (Accessible by UNLOAD_OPERATOR only).
+ * @desc Get all fleet vehicles currently in transit (status == 'IN_TRANSIT')
  */
-router.get('/incoming', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async (req: Request, res: Response) => {
+tripsRouter.get('/incoming', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('trips')
@@ -292,7 +402,7 @@ router.get('/incoming', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async (
     if (error) {
       return res.status(500).json({
         error: 'Database Error',
-        message: 'Failed to fetch incoming transit logs.',
+        message: 'Failed to retrieve incoming fleet.',
         details: error.message,
       });
     }
@@ -310,14 +420,30 @@ router.get('/incoming', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async (
 
 /**
  * @route PUT /api/trips/unload/:id
- * @desc Close the trip loop at the unloading site (Accessible by UNLOAD_OPERATOR only).
+ * @desc Complete the unloading transaction, check geofence limits, and close trip status loop
  */
-router.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async (req: Request, res: Response) => {
+tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async (req: Request, res: Response) => {
   const tripId = parseInt(req.params.id as string, 10);
   if (isNaN(tripId)) {
     return res.status(400).json({
       error: 'Bad Request',
       message: 'Invalid trip ID format.',
+    });
+  }
+
+  const { unloadingLocationId, userLat, userLng, unloadEntryTime, unloadExitTime, unloadDate } = req.body;
+
+  if (!unloadingLocationId) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'unloadingLocationId is required.',
+    });
+  }
+
+  if (typeof userLat !== 'number' || typeof userLng !== 'number') {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'userLat and userLng coordinates must be valid numbers.',
     });
   }
 
@@ -343,51 +469,69 @@ router.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async
       });
     }
 
-    const { unloadingLocation, userLat, userLng, unloadTime } = req.body;
+    // 2. Fetch unloading location coordinates for geofence validation
+    const { data: location, error: locError } = await supabase
+      .from('locations')
+      .select('latitude, longitude, allowed_radius_meters, node_type')
+      .eq('id', unloadingLocationId)
+      .single();
 
-    if (typeof unloadingLocation !== 'string' || unloadingLocation.trim() === '') {
+    if (locError || !location) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'unloadingLocation must be a non-empty string.',
+        message: `Unloading location with ID ${unloadingLocationId} not found.`,
       });
     }
 
-    if (typeof userLat !== 'number' || typeof userLng !== 'number') {
+    if (location.node_type !== 'UNLOAD_SITE') {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'userLat and userLng coordinates must be valid numbers.',
+        message: 'Selected unloadingLocationId is not designated as an UNLOAD_SITE.',
       });
     }
 
-    // RULE C: Geofence validation against Unload Constants
-    const distance = getDistance(userLat, userLng, UNLOAD_LAT, UNLOAD_LNG);
-    if (distance > ALLOWED_RADIUS_METERS) {
+    // RULE 1 (Geofence check): Run Haversine check
+    const distance = getDistance(userLat, userLng, parseFloat(location.latitude), parseFloat(location.longitude));
+    const allowedRadius = parseFloat(location.allowed_radius_meters || '100');
+
+    if (distance > allowedRadius) {
       return res.status(403).json({
         error: 'Forbidden',
-        message: `Geofence violation: Distance from unloading site is ${distance.toFixed(2)}m, which exceeds the allowed radius of ${ALLOWED_RADIUS_METERS}m.`,
+        message: `Geofence violation: Distance from unloading site is ${distance.toFixed(2)}m, which exceeds the allowed radius of ${allowedRadius}m.`,
       });
     }
 
-    const resolvedUnloadTime =
-      unloadTime && typeof unloadTime === 'string' && unloadTime.trim() !== ''
-        ? unloadTime.trim()
-        : new Date().toISOString();
+    const now = new Date();
+    const resolvedEntryTime =
+      unloadEntryTime && typeof unloadEntryTime === 'string' && unloadEntryTime.trim() !== ''
+        ? unloadEntryTime.trim()
+        : now.toISOString();
+
+    const resolvedExitTime =
+      unloadExitTime && typeof unloadExitTime === 'string' && unloadExitTime.trim() !== ''
+        ? unloadExitTime.trim()
+        : now.toISOString();
+
+    const resolvedUnloadDate =
+      unloadDate && typeof unloadDate === 'string' && unloadDate.trim() !== ''
+        ? unloadDate.trim()
+        : now.toISOString().split('T')[0];
 
     const operatorId = await getValidProfileId(req.user?.id);
 
-    // 2. Perform database update
+    // 3. Save the unloading site operations and update status to 'UNLOADED'
     const { data: updatedTrip, error: updateError } = await supabase
       .from('trips')
       .update({
         status: 'UNLOADED',
-        unloading_location: unloadingLocation.trim(),
+        unloading_location_id: unloadingLocationId,
         unload_gps_lat: userLat,
         unload_gps_long: userLng,
-        unload_entry_time: resolvedUnloadTime,
-        unload_exit_time: resolvedUnloadTime,
-        unload_date: resolvedUnloadTime.split('T')[0],
+        unload_entry_time: resolvedEntryTime,
+        unload_exit_time: resolvedExitTime,
+        unload_date: resolvedUnloadDate,
         unload_operator_id: operatorId,
-        updated_at: new Date().toISOString(),
+        updated_at: now.toISOString(),
       })
       .eq('id', tripId)
       .select()
@@ -414,4 +558,4 @@ router.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async
   }
 });
 
-export default router;
+export { tripsRouter, configRouter };

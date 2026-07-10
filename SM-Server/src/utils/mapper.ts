@@ -3,26 +3,23 @@ export interface ClientTrip {
   status: 'INSIDE_QUARRY' | 'IN_TRANSIT' | 'UNLOADED';
   vehicleNumber: string;
   transporterName: string;
-  checkinTime: string;
-  checkinDate?: string;
+  quarryEntryTime: string;
+  quarryEntryDate: string;
   quarryOperatorId?: string | null;
-  checkoutTime?: string | null;
+  quarryExitTime?: string | null;
   transitType?: 'MANUAL' | 'DIGITAL' | null;
   govtStationaryNumber?: string | null;
-  material?: string | null;
-  lorryTyres?: number | null;
-  netWeightTonne?: number | null;
+  dispatchLocationId?: number | null;
+  materialId?: number | null;
+  wheelTypeId?: number | null;
   amountEntry?: number | null;
-  dispatchLocation?: string | null;
-  transitFormPhotoUrl?: string | null;
-  lorryPhotoUrl?: string | null;
+  netWeightTonne?: number | null;
   quarryGpsLat?: number | null;
   quarryGpsLong?: number | null;
   unloadEntryTime?: string | null;
   unloadExitTime?: string | null;
   unloadDate?: string | null;
-  unloadingLocation?: string | null;
-  unloadingPhotoUrl?: string | null;
+  unloadingLocationId?: number | null;
   unloadGpsLat?: number | null;
   unloadGpsLong?: number | null;
   unloadOperatorId?: string | null;
@@ -40,23 +37,27 @@ export function mapToClient(dbTrip: any): ClientTrip {
     status: dbTrip.status,
     vehicleNumber: dbTrip.vehicle_number,
     transporterName: dbTrip.transporter_name,
-    checkinTime: dbTrip.quarry_entry_time,
-    checkinDate: dbTrip.quarry_entry_date,
+    quarryEntryTime: dbTrip.quarry_entry_time,
+    quarryEntryDate: dbTrip.quarry_entry_date,
     quarryOperatorId: dbTrip.quarry_operator_id,
-    checkoutTime: dbTrip.quarry_exit_time,
+    quarryExitTime: dbTrip.quarry_exit_time,
     transitType: dbTrip.transit_type,
     govtStationaryNumber: dbTrip.govt_stationary_number,
-    material: dbTrip.material,
-    lorryTyres: dbTrip.lorry_tyres,
+    dispatchLocationId: dbTrip.dispatch_location_id !== null && dbTrip.dispatch_location_id !== undefined
+      ? parseInt(dbTrip.dispatch_location_id, 10)
+      : null,
+    materialId: dbTrip.material_id !== null && dbTrip.material_id !== undefined
+      ? parseInt(dbTrip.material_id, 10)
+      : null,
+    wheelTypeId: dbTrip.wheel_type_id !== null && dbTrip.wheel_type_id !== undefined
+      ? parseInt(dbTrip.wheel_type_id, 10)
+      : null,
     netWeightTonne: dbTrip.net_weight_tonne !== null && dbTrip.net_weight_tonne !== undefined
       ? parseFloat(dbTrip.net_weight_tonne)
       : null,
     amountEntry: dbTrip.amount_entry !== null && dbTrip.amount_entry !== undefined
       ? parseFloat(dbTrip.amount_entry)
       : null,
-    dispatchLocation: dbTrip.dispatch_location,
-    transitFormPhotoUrl: dbTrip.transit_form_photo_url,
-    lorryPhotoUrl: dbTrip.lorry_photo_url,
     quarryGpsLat: dbTrip.quarry_gps_lat !== null && dbTrip.quarry_gps_lat !== undefined
       ? parseFloat(dbTrip.quarry_gps_lat)
       : null,
@@ -66,8 +67,9 @@ export function mapToClient(dbTrip: any): ClientTrip {
     unloadEntryTime: dbTrip.unload_entry_time,
     unloadExitTime: dbTrip.unload_exit_time,
     unloadDate: dbTrip.unload_date,
-    unloadingLocation: dbTrip.unloading_location,
-    unloadingPhotoUrl: dbTrip.unloading_photo_url,
+    unloadingLocationId: dbTrip.unloading_location_id !== null && dbTrip.unloading_location_id !== undefined
+      ? parseInt(dbTrip.unloading_location_id, 10)
+      : null,
     unloadGpsLat: dbTrip.unload_gps_lat !== null && dbTrip.unload_gps_lat !== undefined
       ? parseFloat(dbTrip.unload_gps_lat)
       : null,

@@ -50,6 +50,7 @@ export const mapApiToUiMaterial = (apiMaterial: string): string => {
 // Generates dynamic Bearer auth headers reading from the active Supabase token
 const getRequestHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
+  console.log("access token: ", session?.access_token);
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${session?.access_token || ''}`,

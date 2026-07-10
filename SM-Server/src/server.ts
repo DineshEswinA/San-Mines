@@ -19,7 +19,7 @@ app.use('/api', apiRouter);
 // Root endpoint descriptive handler
 app.get('/', (req: Request, res: Response) => {
   res.json({
-    message: 'Welcome to the Q-Track API service.',
+    message: 'Welcome to the Sam Mines API service.',
     endpoints: {
       health: '/api/health',
       distance: '/api/distance (POST)',
