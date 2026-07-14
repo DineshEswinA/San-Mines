@@ -128,3 +128,129 @@ INSERT INTO public.locations (name, node_type, latitude, longitude, allowed_radi
 CREATE INDEX idx_trips_status ON public.trips(status);
 CREATE INDEX idx_trips_vehicle_number ON public.trips(vehicle_number);
 CREATE INDEX idx_locations_node_type ON public.locations(node_type);
+
+
+-- =========================================================================
+-- 8. COMPLETE ROW LEVEL SECURITY (RLS) POLICIES FOR SAM MINES
+-- =========================================================================
+
+-- 8.1 ENABLE ROW LEVEL SECURITY ACROSS ALL SYSTEM TABLES
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wheel_types ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
+
+-- =========================================================================
+-- SECTION A: USER ACCESS LAYER (public.profiles)
+-- =========================================================================
+
+-- READ: Any logged-in operator can read their own account credentials & role
+CREATE POLICY select_own_profile ON public.profiles
+    FOR SELECT
+    TO authenticated
+    USING (auth.uid() = id);
+
+-- WRITE (All Actions): Only the Super Admin can create, alter, or drop user nodes
+CREATE POLICY admin_manage_profiles ON public.profiles
+    FOR ALL
+    TO authenticated
+    USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'SUPER_ADMIN')
+    WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'SUPER_ADMIN');
+
+
+-- =========================================================================
+-- SECTION B: MASTER CONFIGURATIONS LAYER (locations, materials, wheel_types)
+-- =========================================================================
+
+-- B.1 LOCATIONS REGISTRY
+CREATE POLICY allow_all_select_locations ON public.locations
+    FOR SELECT
+    TO authenticated
+    USING (is_active = true);
+
+CREATE POLICY admin_modify_locations ON public.locations
+    FOR ALL 
+    TO authenticated
+    USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'SUPER_ADMIN')
+    WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'SUPER_ADMIN');
+
+-- B.2 MATERIALS REGISTRY
+CREATE POLICY allow_all_select_materials ON public.materials
+    FOR SELECT
+    TO authenticated
+    USING (is_active = true);
+
+CREATE POLICY admin_modify_materials ON public.materials
+    FOR ALL
+    TO authenticated
+    USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'SUPER_ADMIN')
+    WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'SUPER_ADMIN');
+
+-- B.3 WHEEL TYPES REGISTRY
+CREATE POLICY allow_all_select_wheel_types ON public.wheel_types
+    FOR SELECT
+    TO authenticated
+    USING (is_active = true);
+
+CREATE POLICY admin_modify_wheel_types ON public.wheel_types
+    FOR ALL
+    TO authenticated
+    USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'SUPER_ADMIN')
+    WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'SUPER_ADMIN');
+
+
+-- =========================================================================
+-- SECTION C: TRANSACTION OPERATIONS LAYER (public.trips)
+-- =========================================================================
+
+-- C.1 QUARRY OPERATOR PERMISSIONS
+-- CREATE: Allows a Quarry Operator to initiate an inbound trip log entry
+CREATE POLICY quarry_insert_trips ON public.trips
+    FOR INSERT
+    TO authenticated
+    WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'QUARRY_OPERATOR');
+
+-- READ: Allows Quarry Operators to read active yard queues or past dispatches they handled
+CREATE POLICY quarry_select_trips ON public.trips
+    FOR SELECT
+    TO authenticated
+    USING (
+        (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'QUARRY_OPERATOR' 
+        AND (status = 'INSIDE_QUARRY' OR quarry_operator_id = auth.uid())
+    );
+
+-- UPDATE: Allows updating the log to check out a truck from the quarry (moving it to 'IN_TRANSIT')
+CREATE POLICY quarry_update_trips ON public.trips
+    FOR UPDATE
+    TO authenticated
+    USING (
+        (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'QUARRY_OPERATOR' 
+        AND status = 'INSIDE_QUARRY'
+    );
+
+-- C.2 UNLOADING OPERATOR PERMISSIONS
+-- READ: Allows Unloading Operators to track trucks on the road or deliveries they personally finalized
+CREATE POLICY unload_select_trips ON public.trips
+    FOR SELECT
+    TO authenticated
+    USING (
+        (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'UNLOAD_OPERATOR'
+        AND (status = 'IN_TRANSIT' OR unload_operator_id = auth.uid())
+    );
+
+-- UPDATE: Allows editing open transit logs to complete the unloading close-out phase
+CREATE POLICY unload_update_trips ON public.trips
+    FOR UPDATE
+    TO authenticated
+    USING (
+        (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'UNLOAD_OPERATOR'
+        AND status = 'IN_TRANSIT'
+    );
+
+-- C.3 SUPER ADMIN MASTER CONTROLS
+-- FULL ACCESS: Super Admins bypass the standard workflows to audit or edit any trip transaction in history
+CREATE POLICY admin_all_trips ON public.trips
+    FOR ALL
+    TO authenticated
+    USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'SUPER_ADMIN');

@@ -558,4 +558,43 @@ tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), 
   }
 });
 
+/**
+ * @route GET /api/trips
+ * @desc Get all trips with optional filtering by status
+ */
+tripsRouter.get('/', requireAuth, async (req: Request, res: Response) => {
+  const { status } = req.query;
+
+  try {
+    let query = supabase.from('trips').select('*', { count: 'exact' });
+
+    if (status && typeof status === 'string') {
+      query = query.eq('status', status);
+    }
+
+    const { data, error, count } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to retrieve trips.',
+        details: error.message,
+      });
+    }
+
+    const mappedTrips = (data || []).map((trip) => mapToClient(trip));
+    return res.json({
+      trips: mappedTrips,
+      total: count || 0,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to query trips.',
+      details: err.message,
+    });
+  }
+});
+
 export { tripsRouter, configRouter };
+

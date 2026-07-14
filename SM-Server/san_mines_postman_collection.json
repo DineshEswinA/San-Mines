@@ -399,6 +399,48 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Trip Operations (General)",
+      "item": [
+        {
+          "name": "Get All/Total Trips",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trips",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trips"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "INSIDE_QUARRY",
+                  "description": "Optional status filter: INSIDE_QUARRY, IN_TRANSIT, UNLOADED",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retrieves all trips in the database along with the total count. Supports optional status query parameter filtering. Accessible to all authenticated users."
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "event": [
