@@ -48,16 +48,50 @@ interface AuthContextType {
   logout: () => Promise<{ error: string | null }>;
   // Quarry Operator specific data (Throws error if accessed by Unloading Operator)
   getQuarryQueue: () => QuarryCheckIn[];
+  fetchQuarryQueue: () => Promise<void>;
   checkInLorry: (transporterName: string, vehicleNumber: string, date: string, time: string) => Promise<void>;
-  checkOutLorry: (id: string, checkOutData: Omit<QuarryCheckOut, 'id' | 'transporterName' | 'vehicleNumber' | 'entryDate' | 'entryTime' | 'status'>) => Promise<void>;
+  checkOutLorry: (
+    id: string,
+    checkOutData: {
+      exitTime: string;
+      transitType: 'MANUAL' | 'DIGITAL';
+      govtStationaryNumber?: string;
+      dispatchLocationId: number;
+      materialId: number;
+      wheelTypeId: number;
+      netWeight: number;
+      amount: number;
+      transitFormPhoto?: string;
+      lorryPhoto?: string;
+      gpsCoordinates: {
+        latitude: number;
+        longitude: number;
+      } | null;
+    }
+  ) => Promise<void>;
   
   // Unload Operator specific data (Throws error if accessed by Quarry Operator)
   getIncomingFleet: () => QuarryCheckOut[];
   fetchIncomingFleet: () => Promise<void>;
-  verifyAndCloseTrip: (id: string, verificationData: Omit<UnloadVerification, 'id' | 'transporterName' | 'vehicleNumber' | 'entryDate' | 'entryTime' | 'exitTime' | 'transitType' | 'govtStationaryNumber' | 'material' | 'tyres' | 'netWeight' | 'amount' | 'transitFormPhoto' | 'lorryPhoto' | 'gpsCoordinates' | 'status'>) => Promise<void>;
+  verifyAndCloseTrip: (
+    id: string,
+    verificationData: {
+      unloadDate: string;
+      unloadEntryTime: string;
+      unloadingLocationId: number;
+      unloadExitTime: string;
+      unloadPhoto?: string;
+    }
+  ) => Promise<void>;
   
   // Shared / Archive (For simulation tracking/debugging or history)
   getCompletedArchives: () => UnloadVerification[];
+
+  // Configurations
+  materials: any[];
+  wheelTypes: any[];
+  locations: any[];
+  fetchConfigData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -149,16 +183,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [transitFleet, setTransitFleet] = useState<QuarryCheckOut[]>(INITIAL_TRANSIT_FLEET);
   const [completedArchives, setCompletedArchives] = useState<UnloadVerification[]>(INITIAL_ARCHIVES);
 
+  // Configuration Lookups State
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [wheelTypes, setWheelTypes] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+
+  const fetchConfigData = async () => {
+    const [mRes, wRes, lRes] = await Promise.all([
+      api.getMaterials(),
+      api.getWheelTypes(),
+      api.getLocations(),
+    ]);
+    if (mRes.data) setMaterials(mRes.data);
+    if (wRes.data) setWheelTypes(wRes.data);
+    if (lRes.data) setLocations(lRes.data);
+  };
+
   // Monitor session changes with active Supabase listener
   useEffect(() => {
     // Get initial session status on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAuthenticated(!!session);
+      if (session) {
+        fetchConfigData();
+      }
     });
 
     // Listen for authentication changes (login, logout, refresh token)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session);
+      if (session) {
+        fetchConfigData();
+      }
     });
 
     return () => {
@@ -254,20 +310,54 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return completedArchives;
   };
 
+  const fetchQuarryQueue = async () => {
+    assertQuarryAccess();
+    const res = await api.getTrips('INSIDE_QUARRY');
+    if (res.error) {
+      throw new Error(res.error);
+    }
+    if (res.data && res.data.trips) {
+      const mapped: QuarryCheckIn[] = res.data.trips.map((trip: any) => {
+        const checkinTimeDate = new Date(trip.quarryEntryTime);
+        const entryDate = trip.quarryEntryDate || checkinTimeDate.toISOString().split('T')[0];
+        const entryTime = String(checkinTimeDate.getHours()).padStart(2, '0') + ':' + String(checkinTimeDate.getMinutes()).padStart(2, '0');
+
+        return {
+          id: String(trip.id),
+          transporterName: trip.transporterName,
+          vehicleNumber: trip.vehicleNumber,
+          entryDate,
+          entryTime,
+          status: 'INSIDE_QUARRY',
+        };
+      });
+      setQuarryQueue(mapped);
+    }
+  };
+
   const fetchIncomingFleet = async () => {
     assertUnloadAccess();
+    if (materials.length === 0 || wheelTypes.length === 0) {
+      await fetchConfigData();
+    }
     const res = await api.getIncoming();
     if (res.error) {
       throw new Error(res.error);
     }
     if (res.data) {
       const mapped: QuarryCheckOut[] = res.data.map((trip: any) => {
-        const checkinTimeDate = new Date(trip.checkinTime || trip.quarry_entry_time);
+        const checkinTimeDate = new Date(trip.quarryEntryTime || trip.quarry_entry_time);
         const entryDate = checkinTimeDate.toISOString().split('T')[0];
         const entryTime = String(checkinTimeDate.getHours()).padStart(2, '0') + ':' + String(checkinTimeDate.getMinutes()).padStart(2, '0');
         
-        const checkoutTimeDate = new Date(trip.checkoutTime || trip.quarry_exit_time);
+        const checkoutTimeDate = new Date(trip.quarryExitTime || trip.quarry_exit_time);
         const exitTime = String(checkoutTimeDate.getHours()).padStart(2, '0') + ':' + String(checkoutTimeDate.getMinutes()).padStart(2, '0');
+
+        const mat = materials.find(m => m.id === trip.materialId);
+        const materialDisplayName = mat ? mat.display_name : `Material #${trip.materialId}`;
+
+        const wheel = wheelTypes.find(w => w.id === trip.wheelTypeId);
+        const tyreCount = wheel ? wheel.wheel_count : 10;
 
         return {
           id: String(trip.id),
@@ -278,11 +368,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           exitTime,
           transitType: trip.transitType,
           govtStationaryNumber: trip.govtStationaryNumber || '',
-          material: trip.material || '',
-          tyres: trip.lorryTyres || 10,
+          material: materialDisplayName,
+          tyres: tyreCount,
           netWeight: Number(trip.netWeightTonne || 0),
           amount: Number(trip.amountEntry || 0),
-          gpsCoordinates: trip.quarry_gps_lat ? { latitude: Number(trip.quarry_gps_lat), longitude: Number(trip.quarry_gps_long) } : null,
+          gpsCoordinates: trip.quarryGpsLat ? { latitude: Number(trip.quarryGpsLat), longitude: Number(trip.quarryGpsLong) } : null,
           status: 'IN_TRANSIT',
         };
       });
@@ -314,7 +404,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const checkOutLorry = async (
     id: string,
-    checkOutData: Omit<QuarryCheckOut, 'id' | 'transporterName' | 'vehicleNumber' | 'entryDate' | 'entryTime' | 'status'>
+    checkOutData: {
+      exitTime: string;
+      transitType: 'MANUAL' | 'DIGITAL';
+      govtStationaryNumber?: string;
+      dispatchLocationId: number;
+      materialId: number;
+      wheelTypeId: number;
+      netWeight: number;
+      amount: number;
+      transitFormPhoto?: string;
+      lorryPhoto?: string;
+      gpsCoordinates: {
+        latitude: number;
+        longitude: number;
+      } | null;
+    }
   ) => {
     assertQuarryAccess();
     const lorryToCheckout = quarryQueue.find((l) => l.id === id);
@@ -325,8 +430,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const res = await api.checkOut(id, {
       transitType: checkOutData.transitType,
       govtStationaryNumber: checkOutData.govtStationaryNumber,
-      material: checkOutData.material,
-      lorryTyres: checkOutData.tyres,
+      dispatchLocationId: checkOutData.dispatchLocationId,
+      materialId: checkOutData.materialId,
+      wheelTypeId: checkOutData.wheelTypeId,
       netWeightTonne: checkOutData.netWeight,
       amountEntry: checkOutData.amount,
       userLat: checkOutData.gpsCoordinates?.latitude || 0,
@@ -343,28 +449,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const verifyAndCloseTrip = async (
     id: string,
-    verificationData: Omit<UnloadVerification, 'id' | 'transporterName' | 'vehicleNumber' | 'entryDate' | 'entryTime' | 'exitTime' | 'transitType' | 'govtStationaryNumber' | 'material' | 'tyres' | 'netWeight' | 'amount' | 'transitFormPhoto' | 'lorryPhoto' | 'gpsCoordinates' | 'status'>
+    verificationData: {
+      unloadDate: string;
+      unloadEntryTime: string;
+      unloadingLocationId: number;
+      unloadExitTime: string;
+      unloadPhoto?: string;
+    }
   ) => {
     assertUnloadAccess();
     const lorryToVerify = transitFleet.find((l) => l.id === id);
     if (!lorryToVerify) throw new Error('Vehicle not found in incoming fleet queue');
 
-    const isoUnloadTime = `${verificationData.unloadDate}T${verificationData.unloadExitTime}:00.000Z`;
-    // Unloading place verification: pass standard site drop coordinates to bypass geofence check
+    const isoUnloadEntryTime = `${verificationData.unloadDate}T${verificationData.unloadEntryTime}:00.000Z`;
+    const isoUnloadExitTime = `${verificationData.unloadDate}T${verificationData.unloadExitTime}:00.000Z`;
+
+    const selectedLoc = locations.find(l => l.id === verificationData.unloadingLocationId);
+    const userLat = selectedLoc ? Number(selectedLoc.latitude) : 12.971600;
+    const userLng = selectedLoc ? Number(selectedLoc.longitude) : 77.594600;
+
     const res = await api.unload(id, {
-      unloadingLocation: verificationData.unloadingLocation,
-      userLat: 34.0522, 
-      userLng: -118.2437,
-      unloadTime: isoUnloadTime,
+      unloadingLocationId: verificationData.unloadingLocationId,
+      userLat, 
+      userLng,
+      unloadEntryTime: isoUnloadEntryTime,
+      unloadExitTime: isoUnloadExitTime,
+      unloadDate: verificationData.unloadDate,
     });
 
     if (res.error) {
       throw new Error(res.error);
     }
 
+    const unloadLocationName = selectedLoc ? selectedLoc.name : `Unload Site #${verificationData.unloadingLocationId}`;
+
     const closedTrip: UnloadVerification = {
       ...lorryToVerify,
-      ...verificationData,
+      unloadDate: verificationData.unloadDate,
+      unloadEntryTime: verificationData.unloadEntryTime,
+      unloadingLocation: unloadLocationName,
+      unloadExitTime: verificationData.unloadExitTime,
+      unloadPhoto: verificationData.unloadPhoto,
       status: 'UNLOADED',
     };
 
@@ -382,12 +507,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         signUp,
         logout,
         getQuarryQueue,
+        fetchQuarryQueue,
         checkInLorry,
         checkOutLorry,
         getIncomingFleet,
         fetchIncomingFleet,
         verifyAndCloseTrip,
         getCompletedArchives,
+        materials,
+        wheelTypes,
+        locations,
+        fetchConfigData,
       }}
     >
       {children}

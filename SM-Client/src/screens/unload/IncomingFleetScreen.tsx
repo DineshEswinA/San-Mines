@@ -14,12 +14,22 @@ import {
 } from 'react-native';
 import { useAuth, QuarryCheckOut, UnloadVerification } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
-import { Input, DateTimeField } from '../../components/ui/Input';
+import { Input, DateTimeField, PickerField } from '../../components/ui/Input';
 import { CameraBox } from '../../components/ui/CameraBox';
 import { Truck, CheckCircle2, ShieldCheck, MapPin, X, History, Route } from 'lucide-react-native';
 
 export const IncomingFleetScreen: React.FC = () => {
-  const { getIncomingFleet, fetchIncomingFleet, verifyAndCloseTrip, getCompletedArchives } = useAuth();
+  const { 
+    getIncomingFleet, 
+    fetchIncomingFleet, 
+    verifyAndCloseTrip, 
+    getCompletedArchives,
+    locations,
+    fetchConfigData
+  } = useAuth();
+
+  // Filter only unload site locations
+  const unloadLocations = locations.filter(l => l.node_type === 'UNLOAD_SITE');
 
   // Selected tab inside Unload Operator screen: 'incoming' or 'history'
   const [activeSubTab, setActiveSubTab] = useState<'incoming' | 'history'>('incoming');
@@ -32,10 +42,13 @@ export const IncomingFleetScreen: React.FC = () => {
   const [selectedLorry, setSelectedLorry] = useState<QuarryCheckOut | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
+  // Form Fields for DB config IDs
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+  const [selectedLocationName, setSelectedLocationName] = useState('');
+
   // Form Fields
   const [unloadDate, setUnloadDate] = useState('');
   const [unloadEntryTime, setUnloadEntryTime] = useState('');
-  const [unloadingLocation, setUnloadingLocation] = useState('');
   const [unloadExitTime, setUnloadExitTime] = useState('');
   const [unloadPhoto, setUnloadPhoto] = useState<string | undefined>(undefined);
 
@@ -54,6 +67,10 @@ export const IncomingFleetScreen: React.FC = () => {
 
   useEffect(() => {
     reloadData();
+    // Load config tables if they haven't been loaded
+    if (locations.length === 0) {
+      fetchConfigData();
+    }
   }, [getIncomingFleet, getCompletedArchives]);
 
   const handleOpenVerify = (lorry: QuarryCheckOut) => {
@@ -76,7 +93,8 @@ export const IncomingFleetScreen: React.FC = () => {
 
     setUnloadDate(dateStr);
     setUnloadEntryTime(`${entryHours}:${entryMinutes}`);
-    setUnloadingLocation('');
+    setSelectedLocationId(null);
+    setSelectedLocationName('');
     setUnloadExitTime(`${exitHours}:${exitMinutes}`);
     setUnloadPhoto(undefined);
     setErrors({});
@@ -89,8 +107,8 @@ export const IncomingFleetScreen: React.FC = () => {
 
     const newErrors: { [key: string]: string } = {};
 
-    if (!unloadingLocation.trim()) {
-      newErrors.unloadingLocation = 'Unloading location point is required';
+    if (!selectedLocationId) {
+      newErrors.unloadingLocation = 'Unloading site location is required';
     }
 
     if (!unloadDate.trim()) {
@@ -118,7 +136,7 @@ export const IncomingFleetScreen: React.FC = () => {
       await verifyAndCloseTrip(selectedLorry.id, {
         unloadDate,
         unloadEntryTime,
-        unloadingLocation: unloadingLocation.trim(),
+        unloadingLocationId: selectedLocationId!,
         unloadExitTime,
         unloadPhoto,
       });
@@ -341,14 +359,20 @@ export const IncomingFleetScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Unloading Location */}
-                <Input
-                  label="Unloading Location Point"
-                  placeholder="e.g. Unload Platform A / Yard Sector 3"
-                  value={unloadingLocation}
-                  onChangeText={setUnloadingLocation}
-                  error={errors.unloadingLocation}
+                {/* Unloading Site Picker */}
+                <PickerField
+                  label="Unloading Site Location"
+                  options={unloadLocations.map(l => l.name)}
+                  selectedValue={selectedLocationName}
+                  onValueChange={(locationName) => {
+                    setSelectedLocationName(locationName);
+                    const loc = unloadLocations.find(l => l.name === locationName);
+                    if (loc) {
+                      setSelectedLocationId(Number(loc.id));
+                    }
+                  }}
                   required={true}
+                  error={errors.unloadingLocation}
                 />
 
                 {/* Exit Time */}

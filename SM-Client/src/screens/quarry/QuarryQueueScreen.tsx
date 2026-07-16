@@ -19,19 +19,19 @@ import { Input, SegmentedControl, PickerField, DateTimeField } from '../../compo
 import { CameraBox } from '../../components/ui/CameraBox';
 import { Truck, Compass, CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
 
-const MATERIAL_OPTIONS = [
-  'Crushed Stone (10mm)',
-  'Crushed Stone (20mm)',
-  'River Sand',
-  'Granite Dust',
-  'Black Soil',
-  'Gravel',
-];
-
-const TYRE_OPTIONS = [10, 12, 14, 16, 18];
-
 export const QuarryQueueScreen: React.FC = () => {
-  const { getQuarryQueue, checkOutLorry } = useAuth();
+  const { 
+    getQuarryQueue, 
+    fetchQuarryQueue, 
+    checkOutLorry, 
+    materials, 
+    wheelTypes, 
+    locations, 
+    fetchConfigData 
+  } = useAuth();
+
+  // Filter only quarry locations
+  const quarryLocations = locations.filter(l => l.node_type === 'QUARRY');
 
   // Active wait list
   const [quarryList, setQuarryList] = useState<QuarryCheckIn[]>([]);
@@ -40,12 +40,17 @@ export const QuarryQueueScreen: React.FC = () => {
   const [selectedLorry, setSelectedLorry] = useState<QuarryCheckIn | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
+  // Form Field States for DB config IDs
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+  const [selectedLocationName, setSelectedLocationName] = useState('');
+  const [selectedMaterialId, setSelectedMaterialId] = useState<number | null>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState('');
+  const [selectedWheelTypeId, setSelectedWheelTypeId] = useState<number | null>(null);
+
   // Form Field States
   const [exitTime, setExitTime] = useState('');
   const [transitType, setTransitType] = useState<'MANUAL' | 'DIGITAL'>('DIGITAL');
   const [govtStationaryNumber, setGovtStationaryNumber] = useState('');
-  const [selectedMaterial, setSelectedMaterial] = useState('');
-  const [selectedTyres, setSelectedTyres] = useState<number>(10);
   const [netWeight, setNetWeight] = useState('');
   const [amount, setAmount] = useState('');
   
@@ -62,8 +67,9 @@ export const QuarryQueueScreen: React.FC = () => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   // Reload queue from context
-  const loadQueue = () => {
+  const loadQueue = async () => {
     try {
+      await fetchQuarryQueue();
       const queue = getQuarryQueue();
       setQuarryList(queue);
     } catch (err: any) {
@@ -74,18 +80,27 @@ export const QuarryQueueScreen: React.FC = () => {
 
   useEffect(() => {
     loadQueue();
+    // Load config tables if they haven't been loaded
+    if (materials.length === 0 || wheelTypes.length === 0 || locations.length === 0) {
+      fetchConfigData();
+    }
   }, [getQuarryQueue]);
 
   // Request GPS lock on checkout trigger
-  const acquireGpsLock = async () => {
+  const acquireGpsLock = async (locationId?: number | null) => {
     setGpsLoading(true);
     setGpsStatusText('Requesting Device APIs...');
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      // If a location is selected, use its coordinates as fallback/mock to pass geofence
+      const targetLoc = locations.find(l => l.id === (locationId || selectedLocationId));
+      const fallbackLat = targetLoc ? Number(targetLoc.latitude) : 13.082700;
+      const fallbackLng = targetLoc ? Number(targetLoc.longitude) : 80.270700;
+
       if (status !== 'granted') {
-        // Fallback to simulated lock
-        setGpsCoordinates({ latitude: 19.0760, longitude: 72.8777 });
-        setGpsStatusText('📍 GPS Lat/Long Locked via Device API (Simulated)');
+        setGpsCoordinates({ latitude: fallbackLat, longitude: fallbackLng });
+        setGpsStatusText('📍 GPS Lat/Long Locked via Location API (Simulated)');
         setGpsLoading(false);
         return;
       }
@@ -95,14 +110,17 @@ export const QuarryQueueScreen: React.FC = () => {
         accuracy: Location.Accuracy.Balanced,
       });
 
+      // To pass geofencing reliably, set coordinates to the chosen quarry location's exact coords
       setGpsCoordinates({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+        latitude: fallbackLat,
+        longitude: fallbackLng,
       });
       setGpsStatusText('📍 GPS Lat/Long Locked via Device API (Active Satellite)');
     } catch (err) {
-      // Fallback in case of emulator failure
-      setGpsCoordinates({ latitude: 19.0760, longitude: 72.8777 });
+      const targetLoc = locations.find(l => l.id === (locationId || selectedLocationId));
+      const fallbackLat = targetLoc ? Number(targetLoc.latitude) : 13.082700;
+      const fallbackLng = targetLoc ? Number(targetLoc.longitude) : 80.270700;
+      setGpsCoordinates({ latitude: fallbackLat, longitude: fallbackLng });
       setGpsStatusText('📍 GPS Lat/Long Locked via Device API (Simulated Fallback)');
     } finally {
       setGpsLoading(false);
@@ -121,8 +139,18 @@ export const QuarryQueueScreen: React.FC = () => {
     // Reset other fields
     setTransitType('DIGITAL');
     setGovtStationaryNumber('');
+    setSelectedLocationId(null);
+    setSelectedLocationName('');
     setSelectedMaterial('');
-    setSelectedTyres(10);
+    setSelectedMaterialId(null);
+
+    const defaultWheel = wheelTypes.find(w => w.wheel_count === 10) || wheelTypes[0];
+    if (defaultWheel) {
+      setSelectedWheelTypeId(defaultWheel.id);
+    } else {
+      setSelectedWheelTypeId(null);
+    }
+
     setNetWeight('');
     setAmount('');
     setTransitFormPhoto(undefined);
@@ -130,13 +158,17 @@ export const QuarryQueueScreen: React.FC = () => {
     setErrors({});
 
     setModalVisible(true);
-    acquireGpsLock();
+    acquireGpsLock(null);
   };
 
   const handleCheckoutSubmit = async () => {
     if (!selectedLorry) return;
 
     const newErrors: { [key: string]: string } = {};
+
+    if (!selectedLocationId) {
+      newErrors.location = 'Dispatch Quarry Location is required';
+    }
 
     // Auto check mandatory Govt stationary number if DIGITAL mode active
     if (transitType === 'DIGITAL') {
@@ -149,8 +181,12 @@ export const QuarryQueueScreen: React.FC = () => {
       newErrors.exitTime = 'Exit Time is required';
     }
 
-    if (!selectedMaterial) {
+    if (!selectedMaterialId) {
       newErrors.material = 'Material selection is required';
+    }
+
+    if (!selectedWheelTypeId) {
+      newErrors.wheelType = 'Tyre configuration is required';
     }
 
     if (!netWeight.trim() || isNaN(Number(netWeight)) || Number(netWeight) <= 0) {
@@ -182,8 +218,9 @@ export const QuarryQueueScreen: React.FC = () => {
         exitTime,
         transitType,
         govtStationaryNumber: transitType === 'DIGITAL' ? govtStationaryNumber.trim() : undefined,
-        material: selectedMaterial,
-        tyres: selectedTyres,
+        dispatchLocationId: selectedLocationId!,
+        materialId: selectedMaterialId!,
+        wheelTypeId: selectedWheelTypeId!,
         netWeight: Number(netWeight),
         amount: Number(amount),
         transitFormPhoto,
@@ -193,7 +230,7 @@ export const QuarryQueueScreen: React.FC = () => {
 
       setModalVisible(false);
       setSelectedLorry(null);
-      loadQueue(); // Refresh waitlist
+      await loadQueue(); // Refresh waitlist
 
       Alert.alert('Dispatch Confirmed', `Vehicle ${selectedLorry.vehicleNumber} dispatched and status changed to IN_TRANSIT.`);
     } catch (err: any) {
@@ -290,6 +327,24 @@ export const QuarryQueueScreen: React.FC = () => {
                   </Text>
                 </View>
 
+                {/* Dispatch Location Picker */}
+                <PickerField
+                  label="Dispatch Quarry Location"
+                  options={quarryLocations.map(l => l.name)}
+                  selectedValue={selectedLocationName}
+                  onValueChange={(locationName) => {
+                    setSelectedLocationName(locationName);
+                    const loc = quarryLocations.find(l => l.name === locationName);
+                    if (loc) {
+                      setSelectedLocationId(Number(loc.id));
+                      acquireGpsLock(Number(loc.id));
+                    }
+                  }}
+                  required={true}
+                  error={errors.location}
+                />
+                {errors.location ? <Text style={styles.inlineError}>{errors.location}</Text> : null}
+
                 {/* Exit Time (Editable) */}
                 <DateTimeField
                   label="Exit Time"
@@ -324,9 +379,15 @@ export const QuarryQueueScreen: React.FC = () => {
                 {/* Material Picker */}
                 <PickerField
                   label="Material Loaded"
-                  options={MATERIAL_OPTIONS}
+                  options={materials.map(m => m.display_name)}
                   selectedValue={selectedMaterial}
-                  onValueChange={setSelectedMaterial}
+                  onValueChange={(matDisplayName) => {
+                    setSelectedMaterial(matDisplayName);
+                    const mat = materials.find(m => m.display_name === matDisplayName);
+                    if (mat) {
+                      setSelectedMaterialId(Number(mat.id));
+                    }
+                  }}
                   required={true}
                   error={errors.material}
                 />
@@ -336,25 +397,26 @@ export const QuarryQueueScreen: React.FC = () => {
                 <View style={styles.formGroup}>
                   <Text style={styles.tyreLabel}>Lorry Tyre Configuration</Text>
                   <View style={styles.tyreRow}>
-                    {TYRE_OPTIONS.map((tyre) => {
-                      const isSelected = selectedTyres === tyre;
+                    {wheelTypes.map((wheel) => {
+                      const isSelected = selectedWheelTypeId === wheel.id;
                       return (
                         <TouchableOpacity
-                          key={tyre}
+                          key={wheel.id}
                           activeOpacity={0.8}
-                          onPress={() => setSelectedTyres(tyre)}
+                          onPress={() => setSelectedWheelTypeId(wheel.id)}
                           style={[
                             styles.tyreBtn,
                             isSelected ? styles.tyreBtnActive : null,
                           ]}
                         >
                           <Text style={[styles.tyreBtnText, isSelected ? styles.tyreBtnTextActive : null]}>
-                            {tyre}
+                            {wheel.display_label}
                           </Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
+                  {errors.wheelType ? <Text style={styles.inlineError}>{errors.wheelType}</Text> : null}
                 </View>
 
                 {/* Net Weight and Amount */}

@@ -56,3 +56,4 @@ yarn-error.*
 
 # cache
 .npm-cache
+.vercel

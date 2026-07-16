@@ -97,8 +97,9 @@ export const api = {
     checkoutData: {
       transitType: 'MANUAL' | 'DIGITAL';
       govtStationaryNumber?: string;
-      material: string;
-      lorryTyres: number;
+      dispatchLocationId: number;
+      materialId: number;
+      wheelTypeId: number;
       netWeightTonne: number;
       amountEntry: number;
       userLat: number;
@@ -108,17 +109,10 @@ export const api = {
   ): Promise<ApiResponse<any>> => {
     try {
       const headers = await getRequestHeaders();
-
-      // Convert UI display material string to postgres enum format
-      const materialEnum = mapUiToApiMaterial(checkoutData.material);
-
       const response = await fetch(`${API_BASE_URL}/api/trips/checkout/${id}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({
-          ...checkoutData,
-          material: materialEnum,
-        }),
+        body: JSON.stringify(checkoutData),
       });
 
       const result = await response.json();
@@ -149,13 +143,7 @@ export const api = {
         return { data: null, error: result.message || 'Failed to retrieve incoming fleet' };
       }
 
-      // Map API enum formats back to UI material formatting for display consistency
-      const mappedTrips = (Array.isArray(result) ? result : []).map((trip: any) => ({
-        ...trip,
-        material: mapApiToUiMaterial(trip.material),
-      }));
-
-      return { data: mappedTrips, error: null };
+      return { data: result, error: null };
     } catch (err: any) {
       return { data: null, error: err.message || 'Network request failed' };
     }
@@ -165,10 +153,12 @@ export const api = {
   unload: async (
     id: string | number,
     unloadData: {
-      unloadingLocation: string;
+      unloadingLocationId: number;
       userLat: number;
       userLng: number;
-      unloadTime?: string;
+      unloadEntryTime?: string;
+      unloadExitTime?: string;
+      unloadDate?: string;
     }
   ): Promise<ApiResponse<any>> => {
     try {
@@ -185,6 +175,84 @@ export const api = {
           return { data: null, error: result.message || 'Geofence Validation Failed: Location is outside permitted unloading site boundary.' };
         }
         return { data: null, error: result.message || `Verification failed: Server returned ${response.status}` };
+      }
+      return { data: result, error: null };
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 5. GET /api/config/wheel-types
+  getWheelTypes: async (): Promise<ApiResponse<any[]>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/wheel-types`, {
+        method: 'GET',
+        headers,
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        return { data: null, error: result.message || 'Failed to retrieve wheel types' };
+      }
+      return { data: result, error: null };
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 6. GET /api/config/materials
+  getMaterials: async (): Promise<ApiResponse<any[]>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/materials`, {
+        method: 'GET',
+        headers,
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        return { data: null, error: result.message || 'Failed to retrieve materials list' };
+      }
+      return { data: result, error: null };
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 7. GET /api/config/locations
+  getLocations: async (type?: 'QUARRY' | 'UNLOAD_SITE'): Promise<ApiResponse<any[]>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const url = type 
+        ? `${API_BASE_URL}/api/config/locations?type=${type}` 
+        : `${API_BASE_URL}/api/config/locations`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        return { data: null, error: result.message || 'Failed to retrieve locations' };
+      }
+      return { data: result, error: null };
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 8. GET /api/trips
+  getTrips: async (status?: string): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const url = status 
+        ? `${API_BASE_URL}/api/trips?status=${status}` 
+        : `${API_BASE_URL}/api/trips`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        return { data: null, error: result.message || 'Failed to retrieve trips' };
       }
       return { data: result, error: null };
     } catch (err: any) {
