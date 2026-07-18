@@ -7,6 +7,7 @@ import {
   Modal,
   StatusBar as RNStatusBar,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -20,12 +21,23 @@ import { HardDrive, User, ChevronDown, Check, ClipboardCheck, ListFilter, LogOut
 import { SplashScreen } from './src/screens/Splash/SplashScreen';
 
 const MainAppContent: React.FC = () => {
-  const { role, setRole, isAuthenticated, logout, isLoading } = useAuth();
+  const { role, setRole, isSuperAdmin, isAuthenticated, logout, isLoading } = useAuth();
   const [splashComplete, setSplashComplete] = useState(false);
-  
+
+  const handleLogoutPress = () => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out of your session?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Out', style: 'destructive', onPress: logout },
+      ]
+    );
+  };
+
   // Quarry Operator active tab: 'checkin' | 'queue'
   const [quarryTab, setQuarryTab] = useState<'checkin' | 'queue'>('checkin');
-  
+
   // Profile dropdown visibility
   const [dropdownVisible, setDropdownVisible] = useState(false);
 
@@ -51,7 +63,7 @@ const MainAppContent: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
-      
+
       {/* 1. Mocked Top-Bar Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
@@ -60,20 +72,37 @@ const MainAppContent: React.FC = () => {
         </View>
 
         {/* Profile Simulator Dropdown Trigger */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setDropdownVisible(true)}
-          style={[
-            styles.profileTrigger,
-            role === 'QUARRY_OPERATOR' ? styles.profileQuarry : styles.profileUnload,
-          ]}
-        >
-          <User size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-          <Text style={styles.profileTriggerText}>
-            {role === 'QUARRY_OPERATOR' ? 'Quarry User' : 'Unload User'}
-          </Text>
-          <ChevronDown size={14} color="#FFFFFF" />
-        </TouchableOpacity>
+        {isSuperAdmin ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setDropdownVisible(true)}
+            style={[
+              styles.profileTrigger,
+              role === 'QUARRY_OPERATOR' ? styles.profileQuarry : role === 'UNLOAD_OPERATOR' ? styles.profileUnload : styles.profileAdmin,
+            ]}
+          >
+            <User size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.profileTriggerText}>
+              {role === 'QUARRY_OPERATOR' ? 'Quarry User (Sim)' : role === 'UNLOAD_OPERATOR' ? 'Unload User (Sim)' : 'Super Admin'}
+            </Text>
+            <ChevronDown size={14} color="#FFFFFF" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleLogoutPress}
+            style={[
+              styles.profileTrigger,
+              role === 'QUARRY_OPERATOR' ? styles.profileQuarry : styles.profileUnload,
+            ]}
+          >
+            <User size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.profileTriggerText}>
+              {role === 'QUARRY_OPERATOR' ? 'Quarry Operator' : 'Unload Operator'}
+            </Text>
+            <LogOut size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 2. Global Role Switcher Modal (Simulator Dropdown) */}
@@ -90,7 +119,7 @@ const MainAppContent: React.FC = () => {
         >
           <View style={styles.dropdownMenu}>
             <Text style={styles.dropdownTitle}>SIMULATE LOGGED IN OPERATOR</Text>
-            
+
             {/* Quarry Operator selection */}
             <TouchableOpacity
               activeOpacity={0.8}
@@ -131,7 +160,7 @@ const MainAppContent: React.FC = () => {
 
             {/* Simulated Logout Selection */}
             <View style={styles.dropdownDivider} />
-            
+
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => {
@@ -160,9 +189,36 @@ const MainAppContent: React.FC = () => {
           ) : (
             <QuarryQueueScreen />
           )
-        ) : (
+        ) : role === 'UNLOAD_OPERATOR' ? (
           // Unloading Operator flow - Strictly isolated screen context
           <IncomingFleetScreen />
+        ) : (
+          // Super Admin Portal Welcome Screen
+          <View style={styles.adminWelcomeContainer}>
+            <View style={styles.adminCard}>
+              <User size={48} color="#60A5FA" style={{ marginBottom: 16 }} />
+              <Text style={styles.adminWelcomeTitle}>Admin Portal</Text>
+              <Text style={styles.adminWelcomeSub}>
+                Select an operator context below or from the profile menu above to begin simulation.
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setRole('QUARRY_OPERATOR')}
+                style={[styles.adminRoleBtn, { backgroundColor: '#1E40AF', borderColor: '#3B82F6' }]}
+              >
+                <Text style={styles.adminRoleBtnText}>Simulate Quarry Operator</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setRole('UNLOAD_OPERATOR')}
+                style={[styles.adminRoleBtn, { backgroundColor: '#16A34A', borderColor: '#4ADE80' }]}
+              >
+                <Text style={styles.adminRoleBtnText}>Simulate Unloading Operator</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
       </View>
 
@@ -248,6 +304,10 @@ const styles = StyleSheet.create({
   profileUnload: {
     backgroundColor: '#16A34A', // Green background for Unloading User
     borderColor: '#4ADE80',
+  },
+  profileAdmin: {
+    backgroundColor: '#374151', // Dark grey background for Super Admin
+    borderColor: '#4B5563',
   },
   profileTriggerText: {
     color: '#FFFFFF',
@@ -350,5 +410,54 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E5E7EB',
     marginVertical: 6,
+  },
+  adminWelcomeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#F3F4F6',
+  },
+  adminCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 28,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  adminWelcomeTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  adminWelcomeSub: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  adminRoleBtn: {
+    width: '100%',
+    height: 48,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  adminRoleBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
 });

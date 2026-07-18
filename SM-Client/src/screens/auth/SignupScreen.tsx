@@ -90,7 +90,7 @@ export const SignupScreen: React.FC<{ onToggleAuthMode: () => void }> = ({ onTog
         Alert.alert(
           'Account Created',
           'Your administrator account has been successfully configured. Please check your inbox if email confirmation is required.',
-          [{ text: 'OK' }]
+          [{ text: 'OK', onPress: onToggleAuthMode }]
         );
       }
     } catch (err: any) {

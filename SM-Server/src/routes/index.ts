@@ -72,7 +72,7 @@ router.get('/profile', requireAuth, (req: Request, res: Response) => {
  * @route GET /admin
  * @desc Restricted administrative route requiring verified Bearer token and 'admin' role.
  */
-router.get('/admin', requireAuth, authorizeRole(['admin']), (req: Request, res: Response) => {
+router.get('/admin', requireAuth, authorizeRole(['SUPER_ADMIN']), (req: Request, res: Response) => {
   return res.json({
     message: 'Welcome to the administrative portal.',
     user: req.user,

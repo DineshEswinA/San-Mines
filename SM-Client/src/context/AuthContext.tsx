@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type Role = 'QUARRY_OPERATOR' | 'UNLOAD_OPERATOR';
+export type Role = 'QUARRY_OPERATOR' | 'UNLOAD_OPERATOR' | 'SUPER_ADMIN';
 
 export interface QuarryCheckIn {
   id: string;
@@ -60,6 +61,7 @@ export interface UnloadVerification extends Omit<QuarryCheckOut, 'status'> {
 interface AuthContextType {
   role: Role;
   setRole: (role: Role) => void;
+  isSuperAdmin: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -117,6 +119,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [role, setRole] = useState<Role>('QUARRY_OPERATOR');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -145,30 +148,94 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     let active = true;
 
-    // Get initial session status on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const fetchUserRole = async (userId: string): Promise<Role> => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user role:', error);
+          return 'QUARRY_OPERATOR';
+        }
+
+        return data?.role || 'QUARRY_OPERATOR';
+      } catch (err) {
+        console.error('Exception fetching user role:', err);
+        return 'QUARRY_OPERATOR';
+      }
+    };
+
+    const initializeUser = async (session: any) => {
+      if (!session) {
+        if (active) {
+          setIsAuthenticated(false);
+          setIsSuperAdmin(false);
+          setIsLoading(false);
+        }
+        try {
+          await AsyncStorage.removeItem('user_role');
+        } catch (err) {
+          console.error('Failed to remove role from storage:', err);
+        }
+        return;
+      }
+
       if (active) {
-        setIsAuthenticated(!!session);
-        if (session) {
-          fetchConfigData().then(() => {
-            if (active) setIsLoading(false);
-          }).catch(() => {
-            if (active) setIsLoading(false);
-          });
-        } else {
+        setIsAuthenticated(true);
+      }
+
+      let fetchedRole: Role | null = null;
+      try {
+        const storedRole = await AsyncStorage.getItem('user_role');
+        if (storedRole && active) {
+          fetchedRole = storedRole as Role;
+          setIsSuperAdmin(fetchedRole === 'SUPER_ADMIN');
+          setRole(fetchedRole);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to read role from local storage:', err);
+      }
+
+      try {
+        await fetchConfigData();
+        const latestRole = await fetchUserRole(session.user.id);
+
+        try {
+          await AsyncStorage.setItem('user_role', latestRole);
+        } catch (err) {
+          console.error('Failed to write role to local storage:', err);
+        }
+
+        if (active) {
+          setIsSuperAdmin(latestRole === 'SUPER_ADMIN');
+        }
+
+        if (active && latestRole !== fetchedRole) {
+          setRole(latestRole);
+        }
+      } catch (err) {
+        console.error('Failed to initialize user session or config:', err);
+      } finally {
+        if (active) {
           setIsLoading(false);
         }
       }
+    };
+
+    // Get initial session status on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      initializeUser(session);
     }).catch(() => {
       if (active) setIsLoading(false);
     });
 
     // Listen for authentication changes (login, logout, refresh token)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session);
-      if (session) {
-        fetchConfigData();
-      }
+      initializeUser(session);
     });
 
     return () => {
@@ -234,19 +301,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
+    try {
+      await AsyncStorage.removeItem('user_role');
+    } catch (err) {
+      console.error('Failed to clear role on logout:', err);
+    }
+    setIsSuperAdmin(false);
     const { error } = await supabase.auth.signOut();
     return { error: error ? error.message : null };
   };
 
   // Security Access Guards
   const assertQuarryAccess = () => {
-    if (role !== 'QUARRY_OPERATOR') {
+    if (role !== 'QUARRY_OPERATOR' && role !== 'SUPER_ADMIN') {
       throw new Error(`Security Violation: Unloading Operator tried to access Quarry Operator memory.`);
     }
   };
 
   const assertUnloadAccess = () => {
-    if (role !== 'UNLOAD_OPERATOR') {
+    if (role !== 'UNLOAD_OPERATOR' && role !== 'SUPER_ADMIN') {
       throw new Error(`Security Violation: Quarry Operator tried to access Unloading Place memory.`);
     }
   };
@@ -446,6 +519,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       value={{
         role,
         setRole,
+        isSuperAdmin,
         isAuthenticated,
         isLoading,
         login,

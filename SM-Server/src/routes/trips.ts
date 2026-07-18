@@ -183,7 +183,7 @@ configRouter.get('/locations', requireAuth, async (req: Request, res: Response) 
  * @route POST /api/trips/checkin
  * @desc Initialize check-in logging for a vehicle arriving at a quarry
  */
-tripsRouter.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (req: Request, res: Response) => {
+tripsRouter.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR', 'SUPER_ADMIN']), async (req: Request, res: Response) => {
   const { vehicleNumber, transporterName, quarryEntryTime, quarryEntryDate } = req.body;
 
   if (!vehicleNumber || typeof vehicleNumber !== 'string' || vehicleNumber.trim() === '') {
@@ -251,7 +251,7 @@ tripsRouter.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), as
  * @route PUT /api/trips/checkout/:id
  * @desc Authorize checkout, validate geofence at quarry location, and set status to 'IN_TRANSIT'
  */
-tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR']), async (req: Request, res: Response) => {
+tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR', 'SUPER_ADMIN']), async (req: Request, res: Response) => {
   const tripId = parseInt(req.params.id as string, 10);
   if (isNaN(tripId)) {
     return res.status(400).json({
@@ -433,7 +433,7 @@ tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR'])
  * @route GET /api/trips/incoming
  * @desc Get all fleet vehicles currently in transit (status == 'IN_TRANSIT')
  */
-tripsRouter.get('/incoming', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async (req: Request, res: Response) => {
+tripsRouter.get('/incoming', requireAuth, authorizeRole(['UNLOAD_OPERATOR', 'SUPER_ADMIN']), async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('trips')
@@ -463,7 +463,7 @@ tripsRouter.get('/incoming', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), as
  * @route PUT /api/trips/unload/:id
  * @desc Complete the unloading transaction, check geofence limits, and close trip status loop
  */
-tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), async (req: Request, res: Response) => {
+tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR', 'SUPER_ADMIN']), async (req: Request, res: Response) => {
   const tripId = parseInt(req.params.id as string, 10);
   if (isNaN(tripId)) {
     return res.status(400).json({

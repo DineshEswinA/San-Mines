@@ -21,10 +21,10 @@ import { CameraBox } from '../../components/ui/CameraBox';
 import { Truck, CheckCircle2, ShieldCheck, MapPin, X, History, Route } from 'lucide-react-native';
 
 export const IncomingFleetScreen: React.FC = () => {
-  const { 
-    getIncomingFleet, 
-    fetchIncomingFleet, 
-    verifyAndCloseTrip, 
+  const {
+    getIncomingFleet,
+    fetchIncomingFleet,
+    verifyAndCloseTrip,
     getCompletedArchives,
     locations,
     fetchConfigData
@@ -107,7 +107,7 @@ export const IncomingFleetScreen: React.FC = () => {
 
     const entryHours = String(now.getHours()).padStart(2, '0');
     const entryMinutes = String(now.getMinutes()).padStart(2, '0');
-    
+
     // Set exit time slightly later for realism, say +15 mins
     const exitTimeObj = new Date(now.getTime() + 15 * 60000);
     const exitHours = String(exitTimeObj.getHours()).padStart(2, '0');
@@ -145,9 +145,9 @@ export const IncomingFleetScreen: React.FC = () => {
       newErrors.unloadExitTime = 'Unload exit time is required';
     }
 
-    if (!unloadPhoto) {
-      newErrors.unloadPhoto = 'Unload security photo capture is required';
-    }
+    // if (!unloadPhoto) {
+    //   newErrors.unloadPhoto = 'Unload security photo capture is required';
+    // }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -280,7 +280,7 @@ export const IncomingFleetScreen: React.FC = () => {
       {/* SearchBar Filter */}
       {!loading && (
         ((activeSubTab === 'incoming' && incomingList.length > 0) ||
-         (activeSubTab === 'history' && historyList.length > 0)) && (
+          (activeSubTab === 'history' && historyList.length > 0)) && (
           <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
             <SearchBar
               value={searchQuery}
