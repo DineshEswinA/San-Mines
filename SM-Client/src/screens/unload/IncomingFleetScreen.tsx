@@ -10,9 +10,11 @@ import {
   Platform,
   Alert,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth, QuarryCheckOut, UnloadVerification, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
+import { SearchBar } from '../../components/ui/SearchBar';
 import { Button } from '../../components/ui/Button';
 import { Input, DateTimeField, PickerField } from '../../components/ui/Input';
 import { CameraBox } from '../../components/ui/CameraBox';
@@ -33,10 +35,29 @@ export const IncomingFleetScreen: React.FC = () => {
 
   // Selected tab inside Unload Operator screen: 'incoming' or 'history'
   const [activeSubTab, setActiveSubTab] = useState<'incoming' | 'history'>('incoming');
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Lists from context
   const incomingList = getIncomingFleet();
   const historyList = getCompletedArchives();
+
+  // Filter lists based on Search Query
+  const filteredIncomingList = incomingList.filter((item) => {
+    const matchSearch =
+      searchQuery.trim() === '' ||
+      item.transporterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.vehicleNumber.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchSearch;
+  });
+
+  const filteredHistoryList = historyList.filter((item) => {
+    const matchSearch =
+      searchQuery.trim() === '' ||
+      item.transporterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.vehicleNumber.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchSearch;
+  });
 
   // Verification Form Modal State
   const [selectedLorry, setSelectedLorry] = useState<QuarryCheckOut | null>(null);
@@ -56,10 +77,13 @@ export const IncomingFleetScreen: React.FC = () => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const reloadData = async () => {
+    setLoading(true);
     try {
       await fetchIncomingFleet();
     } catch (e) {
       // Handle error gracefully
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -253,7 +277,25 @@ export const IncomingFleetScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {activeSubTab === 'incoming' ? (
+      {/* SearchBar Filter */}
+      {!loading && (
+        ((activeSubTab === 'incoming' && incomingList.length > 0) ||
+         (activeSubTab === 'history' && historyList.length > 0)) && (
+          <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+        )
+      )}
+
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <Text style={styles.loaderText}>Fetching Transit Cargo...</Text>
+        </View>
+      ) : activeSubTab === 'incoming' ? (
         incomingList.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Truck size={48} color="#9CA3AF" />
@@ -262,9 +304,17 @@ export const IncomingFleetScreen: React.FC = () => {
               Vehicles dispatched from the Quarry operator terminal will show up here as IN_TRANSIT.
             </Text>
           </View>
+        ) : filteredIncomingList.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Truck size={48} color="#9CA3AF" />
+            <Text style={styles.emptyText}>No matching vehicles found</Text>
+            <Text style={styles.emptySubtext}>
+              Try adjusting your search query.
+            </Text>
+          </View>
         ) : (
           <FlatList
-            data={incomingList}
+            data={filteredIncomingList}
             keyExtractor={(item) => item.id}
             renderItem={renderIncomingCard}
             contentContainerStyle={styles.listContent}
@@ -278,9 +328,17 @@ export const IncomingFleetScreen: React.FC = () => {
             Verified offloads will appear in this historical workspace archive.
           </Text>
         </View>
+      ) : filteredHistoryList.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <History size={48} color="#9CA3AF" />
+          <Text style={styles.emptyText}>No matching vehicles found</Text>
+          <Text style={styles.emptySubtext}>
+            Try adjusting your search query.
+          </Text>
+        </View>
       ) : (
         <FlatList
-          data={historyList}
+          data={filteredHistoryList}
           keyExtractor={(item) => item.id}
           renderItem={renderHistoryCard}
           contentContainerStyle={styles.listContent}
@@ -421,6 +479,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#4B5563',
+    fontWeight: '500',
   },
   tabBar: {
     flexDirection: 'row',

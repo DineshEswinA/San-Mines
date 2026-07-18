@@ -25,6 +25,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [entryDate, setEntryDate] = useState('');
   const [entryTime, setEntryTime] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Validation errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -32,7 +33,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
   // Initialize fields with current timestamp on mount
   useEffect(() => {
     const now = new Date();
-    
+
     // YYYY-MM-DD format
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -76,6 +77,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
     }
 
     setErrors({});
+    setLoading(true);
 
     try {
       await checkInLorry(transporterName, vehicleNumber, entryDate, entryTime);
@@ -89,14 +91,14 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
               // Reset non-date inputs
               setTransporterName('');
               setVehicleNumber('');
-              // Direct tab change to live queue board
-              onSuccess();
             },
           },
         ]
       );
     } catch (err: any) {
       Alert.alert('Check-In Failed', err.message || 'An unexpected network error occurred.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -124,6 +126,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
               error={errors.transporterName}
               required={true}
               autoCapitalize="words"
+              editable={!loading}
             />
 
             <Input
@@ -135,6 +138,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
               required={true}
               autoCapitalize="characters"
               isAlphanumeric={true}
+              editable={!loading}
             />
 
             <View style={styles.dateTimeRow}>
@@ -145,6 +149,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
                   onChange={setEntryDate}
                   mode="date"
                   required={true}
+                  disabled={loading}
                 />
               </View>
               <View style={styles.halfWidth}>
@@ -154,14 +159,18 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
                   onChange={setEntryTime}
                   mode="time"
                   required={true}
+                  disabled={loading}
                 />
               </View>
             </View>
 
             <Button
-              title="Register & Check-In Lorry"
+              title="Check-in Vehicle"
+              loadingTitle="Checking in..."
               variant="primary"
               onPress={handleCheckIn}
+              disabled={loading}
+              loading={loading}
               style={styles.submitBtn}
             />
           </View>

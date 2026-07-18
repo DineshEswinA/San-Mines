@@ -17,6 +17,7 @@ import * as Location from 'expo-location';
 import { useAuth, QuarryCheckIn, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input, SegmentedControl, PickerField, DateTimeField } from '../../components/ui/Input';
+import { SearchBar } from '../../components/ui/SearchBar';
 import { CameraBox } from '../../components/ui/CameraBox';
 import { Truck, Compass, CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
 
@@ -36,6 +37,19 @@ export const QuarryQueueScreen: React.FC = () => {
 
   // Active wait list from context
   const quarryList = getQuarryQueue();
+
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filtered Quarry queue
+  const filteredQuarryList = quarryList.filter((item) => {
+    const matchSearch =
+      searchQuery.trim() === '' ||
+      item.transporterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.vehicleNumber.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchSearch;
+  });
 
   // Checkout Modal State
   const [selectedLorry, setSelectedLorry] = useState<QuarryCheckIn | null>(null);
@@ -290,9 +304,16 @@ export const QuarryQueueScreen: React.FC = () => {
       <View style={styles.boardHeader}>
         <Text style={styles.boardTitle}>Quarry Waiting Yard</Text>
         <View style={styles.counterBadge}>
-          <Text style={styles.counterText}>{quarryList.length} Lorries Waiting</Text>
+          <Text style={styles.counterText}>{filteredQuarryList.length} Lorries Waiting</Text>
         </View>
       </View>
+
+      {quarryList.length > 0 && (
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      )}
 
       {loading ? (
         <View style={styles.loaderContainer}>
@@ -305,9 +326,15 @@ export const QuarryQueueScreen: React.FC = () => {
           <Text style={styles.emptyText}>Yard is Clear</Text>
           <Text style={styles.emptySubtext}>New vehicles checked-in will appear here immediately.</Text>
         </View>
+      ) : filteredQuarryList.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Truck size={48} color="#9CA3AF" />
+          <Text style={styles.emptyText}>No matching vehicles found</Text>
+          <Text style={styles.emptySubtext}>Try adjusting your search query or time range filter.</Text>
+        </View>
       ) : (
         <FlatList
-          data={quarryList}
+          data={filteredQuarryList}
           keyExtractor={(item) => item.id}
           renderItem={renderLorryCard}
           contentContainerStyle={styles.listContainer}
@@ -523,6 +550,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
     padding: 16,
+  },
+  filterSection: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  searchBar: {
+    marginBottom: 8,
+  },
+  timeFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  timePickerCol: {
+    flex: 1,
+    marginRight: 8,
+  },
+  clearBtn: {
+    height: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  clearBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+    textTransform: 'uppercase',
   },
   boardHeader: {
     flexDirection: 'row',

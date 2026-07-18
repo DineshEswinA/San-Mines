@@ -122,6 +122,7 @@ interface PickerFieldProps {
   required?: boolean;
   error?: string;
   containerStyle?: ViewStyle;
+  disabled?: boolean;
 }
 
 export const PickerField: React.FC<PickerFieldProps> = ({
@@ -132,6 +133,7 @@ export const PickerField: React.FC<PickerFieldProps> = ({
   required = false,
   error,
   containerStyle,
+  disabled = false,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -142,8 +144,15 @@ export const PickerField: React.FC<PickerFieldProps> = ({
       </Text>
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => setModalVisible(true)}
-        style={[styles.pickerTrigger, error ? styles.textInputError : null]}
+        onPress={() => {
+          if (disabled) return;
+          setModalVisible(true);
+        }}
+        style={[
+          styles.pickerTrigger,
+          error ? styles.textInputError : null,
+          disabled && { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
+        ]}
       >
         <Text style={selectedValue ? styles.pickerTriggerText : styles.pickerPlaceholderText}>
           {selectedValue || 'Select Material'}
@@ -170,7 +179,7 @@ export const PickerField: React.FC<PickerFieldProps> = ({
               keyExtractor={(item) => item}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[
+                   style={[
                     styles.modalItem,
                     selectedValue === item ? styles.modalItemActive : null,
                   ]}
@@ -207,6 +216,7 @@ interface DateTimeFieldProps {
   mode: 'date' | 'time';
   required?: boolean;
   containerStyle?: ViewStyle;
+  disabled?: boolean;
 }
 
 export const DateTimeField: React.FC<DateTimeFieldProps> = ({
@@ -216,6 +226,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
   mode,
   required = false,
   containerStyle,
+  disabled = false,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [tempValue, setTempValue] = useState(value);
@@ -238,10 +249,14 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => {
+          if (disabled) return;
           setTempValue(value);
           setModalVisible(true);
         }}
-        style={styles.pickerTrigger}
+        style={[
+          styles.pickerTrigger,
+          disabled && { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
+        ]}
       >
         <Text style={styles.pickerTriggerText}>{value}</Text>
         {mode === 'date' ? (

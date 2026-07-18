@@ -7,6 +7,7 @@ interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'danger' | 'outline';
   disabled?: boolean;
   loading?: boolean;
+  loadingTitle?: string;
   style?: ViewStyle;
   textStyle?: TextStyle;
 }
@@ -17,6 +18,7 @@ export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   disabled = false,
   loading = false,
+  loadingTitle,
   style,
   textStyle,
 }) => {
@@ -57,13 +59,15 @@ export const Button: React.FC<ButtonProps> = ({
       accessibilityRole="button"
       accessibilityState={{ disabled: disabled || loading }}
     >
-      {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? '#1E40AF' : '#FFFFFF'} />
-      ) : (
-        <Text style={[getTextStyle(), disabled && styles.disabledText, textStyle]}>
-          {title}
-        </Text>
+      {loading && (
+        <ActivityIndicator 
+          color={variant === 'outline' ? '#1E40AF' : '#FFFFFF'} 
+          style={{ marginRight: 10 }}
+        />
       )}
+      <Text style={[getTextStyle(), disabled && styles.disabledText, textStyle]}>
+        {loading ? (loadingTitle || `${title}...`) : title}
+      </Text>
     </TouchableOpacity>
   );
 };
@@ -100,8 +104,7 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   disabledBtn: {
-    backgroundColor: '#E5E7EB',
-    borderColor: '#D1D5DB',
+    opacity: 0.5,
   },
   buttonText: {
     fontSize: 16,
@@ -118,6 +121,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   disabledText: {
-    color: '#9CA3AF',
+    // Opacity on container handles visual dimming
   },
 });

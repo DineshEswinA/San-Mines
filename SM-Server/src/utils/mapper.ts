@@ -27,8 +27,28 @@ export interface ClientTrip {
 
 const toEpoch = (dateString: string | null | undefined): number | null => {
   if (!dateString) return null;
-  const time = new Date(dateString).getTime();
-  return isNaN(time) ? null : time;
+  
+  // Normalize format: e.g. "2026-07-18 10:31:00+00" -> replace space with T
+  const normalized = dateString.replace(' ', 'T');
+  
+  // Extract date and time parts
+  const parts = normalized.split('T');
+  if (parts.length < 2) {
+    const time = new Date(dateString).getTime();
+    return isNaN(time) ? null : time;
+  }
+  
+  const datePart = parts[0]; // e.g. "2026-07-18"
+  const timePart = parts[1]; // e.g. "10:31:00+00"
+  
+  // Split by timezone designator indicators (+ or Z) to get the local time portion
+  const timeClean = timePart.split(/[+Z]/)[0];
+  
+  // Re-build ISO-8601 string bound to GMT+05:30 local offset
+  const localIsoString = `${datePart}T${timeClean.includes('.') ? timeClean : timeClean + '.000'}+05:30`;
+  
+  const epoch = new Date(localIsoString).getTime();
+  return isNaN(epoch) ? null : epoch;
 };
 
 /**
