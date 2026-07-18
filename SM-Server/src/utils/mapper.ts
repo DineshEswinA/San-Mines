@@ -3,10 +3,10 @@ export interface ClientTrip {
   status: 'INSIDE_QUARRY' | 'IN_TRANSIT' | 'UNLOADED';
   vehicleNumber: string;
   transporterName: string;
-  quarryEntryTime: string;
+  quarryEntryTime: number;
   quarryEntryDate: string;
   quarryOperatorId?: string | null;
-  quarryExitTime?: string | null;
+  quarryExitTime?: number | null;
   transitType?: 'MANUAL' | 'DIGITAL' | null;
   govtStationaryNumber?: string | null;
   dispatchLocationId?: number | null;
@@ -16,14 +16,20 @@ export interface ClientTrip {
   netWeightTonne?: number | null;
   quarryGpsLat?: number | null;
   quarryGpsLong?: number | null;
-  unloadEntryTime?: string | null;
-  unloadExitTime?: string | null;
+  unloadEntryTime?: number | null;
+  unloadExitTime?: number | null;
   unloadDate?: string | null;
   unloadingLocationId?: number | null;
   unloadGpsLat?: number | null;
   unloadGpsLong?: number | null;
   unloadOperatorId?: string | null;
 }
+
+const toEpoch = (dateString: string | null | undefined): number | null => {
+  if (!dateString) return null;
+  const time = new Date(dateString).getTime();
+  return isNaN(time) ? null : time;
+};
 
 /**
  * Transforms a raw database record in snake_case format to the camelCase contract.
@@ -37,10 +43,10 @@ export function mapToClient(dbTrip: any): ClientTrip {
     status: dbTrip.status,
     vehicleNumber: dbTrip.vehicle_number,
     transporterName: dbTrip.transporter_name,
-    quarryEntryTime: dbTrip.quarry_entry_time,
-    quarryEntryDate: dbTrip.quarry_entry_date,
+    quarryEntryTime: toEpoch(dbTrip.quarry_entry_time) || Date.now(),
+    quarryEntryDate: dbTrip.quarry_entry_date || (dbTrip.quarry_entry_time ? dbTrip.quarry_entry_time.split('T')[0] : null),
     quarryOperatorId: dbTrip.quarry_operator_id,
-    quarryExitTime: dbTrip.quarry_exit_time,
+    quarryExitTime: toEpoch(dbTrip.quarry_exit_time),
     transitType: dbTrip.transit_type,
     govtStationaryNumber: dbTrip.govt_stationary_number,
     dispatchLocationId: dbTrip.dispatch_location_id !== null && dbTrip.dispatch_location_id !== undefined
@@ -64,8 +70,8 @@ export function mapToClient(dbTrip: any): ClientTrip {
     quarryGpsLong: dbTrip.quarry_gps_long !== null && dbTrip.quarry_gps_long !== undefined
       ? parseFloat(dbTrip.quarry_gps_long)
       : null,
-    unloadEntryTime: dbTrip.unload_entry_time,
-    unloadExitTime: dbTrip.unload_exit_time,
+    unloadEntryTime: toEpoch(dbTrip.unload_entry_time),
+    unloadExitTime: toEpoch(dbTrip.unload_exit_time),
     unloadDate: dbTrip.unload_date,
     unloadingLocationId: dbTrip.unloading_location_id !== null && dbTrip.unloading_location_id !== undefined
       ? parseInt(dbTrip.unloading_location_id, 10)

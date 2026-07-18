@@ -200,9 +200,11 @@ tripsRouter.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), as
     });
   }
 
-  // Fallback to machine timestamps if missing from payload, keeping them editable if passed down
+  // Fallback to machine timestamps if missing from payload, deriving date from entry time if possible
   const now = new Date();
-  const resolvedEntryDate = resolveDateOnly(quarryEntryDate, now);
+  const resolvedEntryDate = quarryEntryTime && quarryEntryTime.includes('T')
+    ? quarryEntryTime.split('T')[0]
+    : resolveDateOnly(quarryEntryDate || null, now);
   const resolvedEntryTime = combineDateTimeToIso(quarryEntryTime, resolvedEntryDate, now);
 
   try {
@@ -591,13 +593,20 @@ tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), 
  * @desc Get all trips with optional filtering by status
  */
 tripsRouter.get('/', requireAuth, async (req: Request, res: Response) => {
+  const userRole = req.user?.role;
   const { status } = req.query;
 
   try {
     let query = supabase.from('trips').select('*', { count: 'exact' });
 
-    if (status && typeof status === 'string') {
-      query = query.eq('status', status);
+    if (userRole === 'QUARRY_OPERATOR') {
+      query = query.eq('status', 'INSIDE_QUARRY');
+    } else if (userRole === 'UNLOAD_OPERATOR') {
+      query = query.eq('status', 'IN_TRANSIT');
+    } else {
+      if (status && typeof status === 'string') {
+        query = query.eq('status', status);
+      }
     }
 
     const { data, error, count } = await query.order('created_at', { ascending: false });

@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth, QuarryCheckOut, UnloadVerification } from '../../context/AuthContext';
+import { useAuth, QuarryCheckOut, UnloadVerification, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input, DateTimeField, PickerField } from '../../components/ui/Input';
 import { CameraBox } from '../../components/ui/CameraBox';
@@ -34,9 +34,9 @@ export const IncomingFleetScreen: React.FC = () => {
   // Selected tab inside Unload Operator screen: 'incoming' or 'history'
   const [activeSubTab, setActiveSubTab] = useState<'incoming' | 'history'>('incoming');
 
-  // Lists
-  const [incomingList, setIncomingList] = useState<QuarryCheckOut[]>([]);
-  const [historyList, setHistoryList] = useState<UnloadVerification[]>([]);
+  // Lists from context
+  const incomingList = getIncomingFleet();
+  const historyList = getCompletedArchives();
 
   // Verification Form Modal State
   const [selectedLorry, setSelectedLorry] = useState<QuarryCheckOut | null>(null);
@@ -58,11 +58,9 @@ export const IncomingFleetScreen: React.FC = () => {
   const reloadData = async () => {
     try {
       await fetchIncomingFleet();
-      setIncomingList(getIncomingFleet());
     } catch (e) {
-      setIncomingList([]);
+      // Handle error gracefully
     }
-    setHistoryList(getCompletedArchives());
   };
 
   useEffect(() => {
@@ -71,7 +69,7 @@ export const IncomingFleetScreen: React.FC = () => {
     if (locations.length === 0) {
       fetchConfigData();
     }
-  }, [getIncomingFleet, getCompletedArchives]);
+  }, []);
 
   const handleOpenVerify = (lorry: QuarryCheckOut) => {
     setSelectedLorry(lorry);
@@ -183,7 +181,7 @@ export const IncomingFleetScreen: React.FC = () => {
           Transporter: <Text style={styles.footerValue}>{item.transporterName}</Text>
         </Text>
         <Text style={styles.footerLabel}>
-          Dispatched from Quarry: <Text style={styles.footerValue}>{item.exitTime}</Text>
+          Dispatched from Quarry: <Text style={styles.footerValue}>{formatDateOnly(item.exitTime)} @ {formatTimeTo12Hour(item.exitTime)}</Text>
         </Text>
       </View>
 
@@ -333,7 +331,7 @@ export const IncomingFleetScreen: React.FC = () => {
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Quarry Exit Time:</Text>
-                    <Text style={styles.manifestValue}>{selectedLorry.exitTime}</Text>
+                    <Text style={styles.manifestValue}>{formatDateOnly(selectedLorry.exitTime)} @ {formatTimeTo12Hour(selectedLorry.exitTime)}</Text>
                   </View>
                 </View>
 

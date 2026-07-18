@@ -102,8 +102,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.user = {
       id: decoded.sub || decoded.id,
       email: decoded.email,
-      role,
-      ...decoded,
+      role
+      // ...decoded,
     };
 
     return next();

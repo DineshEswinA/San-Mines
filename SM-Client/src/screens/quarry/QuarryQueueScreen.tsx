@@ -10,32 +10,33 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { useAuth, QuarryCheckIn } from '../../context/AuthContext';
+import { useAuth, QuarryCheckIn, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input, SegmentedControl, PickerField, DateTimeField } from '../../components/ui/Input';
 import { CameraBox } from '../../components/ui/CameraBox';
 import { Truck, Compass, CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
 
 export const QuarryQueueScreen: React.FC = () => {
-  const { 
-    getQuarryQueue, 
-    fetchQuarryQueue, 
-    checkOutLorry, 
-    materials, 
-    wheelTypes, 
-    locations, 
-    fetchConfigData 
+  const {
+    getQuarryQueue,
+    fetchQuarryQueue,
+    checkOutLorry,
+    materials,
+    wheelTypes,
+    locations,
+    fetchConfigData
   } = useAuth();
 
   // Filter only quarry locations
   const quarryLocations = locations.filter(l => l.node_type === 'QUARRY');
 
-  // Active wait list
-  const [quarryList, setQuarryList] = useState<QuarryCheckIn[]>([]);
-  
+  // Active wait list from context
+  const quarryList = getQuarryQueue();
+
   // Checkout Modal State
   const [selectedLorry, setSelectedLorry] = useState<QuarryCheckIn | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -53,7 +54,7 @@ export const QuarryQueueScreen: React.FC = () => {
   const [govtStationaryNumber, setGovtStationaryNumber] = useState('');
   const [netWeight, setNetWeight] = useState('');
   const [amount, setAmount] = useState('');
-  
+
   // Camera images
   const [transitFormPhoto, setTransitFormPhoto] = useState<string | undefined>(undefined);
   const [lorryPhoto, setLorryPhoto] = useState<string | undefined>(undefined);
@@ -66,15 +67,17 @@ export const QuarryQueueScreen: React.FC = () => {
   // Validation errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  const [loading, setLoading] = useState(false);
+
   // Reload queue from context
   const loadQueue = async () => {
+    setLoading(true);
     try {
       await fetchQuarryQueue();
-      const queue = getQuarryQueue();
-      setQuarryList(queue);
     } catch (err: any) {
       // In case role changes, safety boundary will throw. Handle gracefully.
-      setQuarryList([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -84,7 +87,7 @@ export const QuarryQueueScreen: React.FC = () => {
     if (materials.length === 0 || wheelTypes.length === 0 || locations.length === 0) {
       fetchConfigData();
     }
-  }, [getQuarryQueue]);
+  }, []);
 
   // Request GPS lock on checkout trigger
   const acquireGpsLock = async (locationId?: number | null) => {
@@ -92,7 +95,7 @@ export const QuarryQueueScreen: React.FC = () => {
     setGpsStatusText('Requesting Device APIs...');
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      
+
       // If a location is selected, use its coordinates as fallback/mock to pass geofence
       const targetLoc = locations.find(l => l.id === (locationId || selectedLocationId));
       const fallbackLat = targetLoc ? Number(targetLoc.latitude) : 13.082700;
@@ -129,7 +132,7 @@ export const QuarryQueueScreen: React.FC = () => {
 
   const handleOpenCheckout = (lorry: QuarryCheckIn) => {
     setSelectedLorry(lorry);
-    
+
     // Auto-fill Exit Time with current local runtime
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -198,19 +201,33 @@ export const QuarryQueueScreen: React.FC = () => {
     }
 
     // Require photos for security verification
-    if (!transitFormPhoto) {
-      newErrors.transitFormPhoto = 'Transit Form capture is required';
-    }
+    // if (!transitFormPhoto) {
+    //   newErrors.transitFormPhoto = 'Transit Form capture is required';
+    // }
 
-    if (!lorryPhoto) {
-      newErrors.lorryPhoto = 'Lorry Photo capture is required';
-    }
+    // if (!lorryPhoto) {
+    //   newErrors.lorryPhoto = 'Lorry Photo capture is required';
+    // }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       Alert.alert('Verification Failed', 'Please fix form validation errors and verify camera captures before dispatch.');
       return;
     }
+
+    console.log({
+      exitTime,
+      transitType,
+      govtStationaryNumber: transitType === 'DIGITAL' ? govtStationaryNumber.trim() : undefined,
+      dispatchLocationId: selectedLocationId!,
+      materialId: selectedMaterialId!,
+      wheelTypeId: selectedWheelTypeId!,
+      netWeight: Number(netWeight),
+      amount: Number(amount),
+      transitFormPhoto,
+      lorryPhoto,
+      gpsCoordinates,
+    })
 
     // Process checkout
     try {
@@ -246,7 +263,7 @@ export const QuarryQueueScreen: React.FC = () => {
           <Text style={styles.vehicleNo}>{item.vehicleNumber}</Text>
         </View>
         <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>INSIDE_QUARRY</Text>
+          <Text style={styles.statusText}>{item.status}</Text>
         </View>
       </View>
 
@@ -255,7 +272,7 @@ export const QuarryQueueScreen: React.FC = () => {
           Transporter: <Text style={styles.detailValue}>{item.transporterName}</Text>
         </Text>
         <Text style={styles.detailLabel}>
-          Checked-In: <Text style={styles.detailValue}>{item.entryDate} @ {item.entryTime}</Text>
+          Checked-In: <Text style={styles.detailValue}>{formatDateOnly(item.entryTime)}, {formatTimeTo12Hour(item.entryTime)}</Text>
         </Text>
       </View>
 
@@ -277,7 +294,12 @@ export const QuarryQueueScreen: React.FC = () => {
         </View>
       </View>
 
-      {quarryList.length === 0 ? (
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#1E40AF" />
+          <Text style={styles.loaderText}>Loading Yard Records...</Text>
+        </View>
+      ) : quarryList.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Truck size={48} color="#9CA3AF" />
           <Text style={styles.emptyText}>Yard is Clear</Text>
@@ -323,7 +345,7 @@ export const QuarryQueueScreen: React.FC = () => {
                 {/* Vehicle Quick Info */}
                 <View style={styles.summaryBar}>
                   <Text style={styles.summaryText}>
-                    Transporter: <Text style={{ fontWeight: 'bold' }}>{selectedLorry.transporterName}</Text> | In: <Text style={{ fontWeight: 'bold' }}>{selectedLorry.entryTime}</Text>
+                    Transporter: <Text style={{ fontWeight: 'bold' }}>{selectedLorry.transporterName}</Text> | In: <Text style={{ fontWeight: 'bold' }}>{formatTimeTo12Hour(selectedLorry.entryTime)}</Text>
                   </Text>
                 </View>
 
@@ -375,7 +397,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   required={transitType === 'DIGITAL'}
                   isAlphanumeric={true}
                 />
-                
+
                 {/* Material Picker */}
                 <PickerField
                   label="Material Loaded"
@@ -584,6 +606,18 @@ const styles = StyleSheet.create({
   cardCheckoutBtn: {
     height: 48,
     marginVertical: 0,
+  },
+  // Loader styles
+  loaderContainer: {
+    flex: 0.6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderText: {
+    marginTop: 12,
+    color: '#4B5563',
+    fontSize: 14,
+    fontWeight: '600',
   },
   // Empty queue styles
   emptyContainer: {

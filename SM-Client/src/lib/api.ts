@@ -73,9 +73,13 @@ export const api = {
   checkIn: async (
     vehicleNumber: string,
     transporterName: string,
-    quarryEntryTime?: string,
-    quarryEntryDate?: string
+    quarryEntryTime?: string
   ): Promise<ApiResponse<any>> => {
+    console.log({
+      vehicleNumber: vehicleNumber.trim().toUpperCase(),
+      transporterName: transporterName.trim(),
+      quarryEntryTime
+    });
     try {
       const headers = await getRequestHeaders();
       const response = await fetch(`${API_BASE_URL}/api/trips/checkin`, {
@@ -85,7 +89,6 @@ export const api = {
           vehicleNumber: vehicleNumber.trim().toUpperCase(),
           transporterName: transporterName.trim(),
           quarryEntryTime,
-          quarryEntryDate,
         }),
       });
 
@@ -112,7 +115,7 @@ export const api = {
       amountEntry: number;
       userLat: number;
       userLng: number;
-      checkoutTime?: string;
+      quarryExitTime?: string;
     }
   ): Promise<ApiResponse<any>> => {
     try {
@@ -137,25 +140,7 @@ export const api = {
     }
   },
 
-  // 3. GET /api/trips/incoming
-  getIncoming: async (): Promise<ApiResponse<any[]>> => {
-    try {
-      const headers = await getRequestHeaders();
-      const response = await fetch(`${API_BASE_URL}/api/trips/incoming`, {
-        method: 'GET',
-        headers,
-      });
 
-      const result = await response.json();
-      if (!response.ok) {
-        return { data: null, error: result.message || 'Failed to retrieve incoming fleet' };
-      }
-
-      return { data: result, error: null };
-    } catch (err: any) {
-      return { data: null, error: err.message || 'Network request failed' };
-    }
-  },
 
   // 4. PUT /api/trips/unload/:id
   unload: async (
