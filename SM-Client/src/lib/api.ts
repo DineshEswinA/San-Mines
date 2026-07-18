@@ -2,7 +2,13 @@ import { supabase } from './supabase';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-let API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+// Declare global React Native __DEV__ variable for TypeScript compiler if needed
+declare const __DEV__: boolean;
+
+console.log("EXPO_PUBLIC_API_URL - " + process.env.EXPO_PUBLIC_API_URL);
+let API_BASE_URL = __DEV__
+  ? (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000')
+  : 'https://san-mines.vercel.app';
 
 // Auto-resolve localhost/127.0.0.1 issues for simulators and physical devices
 if (API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1')) {
@@ -222,8 +228,8 @@ export const api = {
   getLocations: async (type?: 'QUARRY' | 'UNLOAD_SITE'): Promise<ApiResponse<any[]>> => {
     try {
       const headers = await getRequestHeaders();
-      const url = type 
-        ? `${API_BASE_URL}/api/config/locations?type=${type}` 
+      const url = type
+        ? `${API_BASE_URL}/api/config/locations?type=${type}`
         : `${API_BASE_URL}/api/config/locations`;
       const response = await fetch(url, {
         method: 'GET',
@@ -243,8 +249,8 @@ export const api = {
   getTrips: async (status?: string): Promise<ApiResponse<any>> => {
     try {
       const headers = await getRequestHeaders();
-      const url = status 
-        ? `${API_BASE_URL}/api/trips?status=${status}` 
+      const url = status
+        ? `${API_BASE_URL}/api/trips?status=${status}`
         : `${API_BASE_URL}/api/trips`;
       const response = await fetch(url, {
         method: 'GET',

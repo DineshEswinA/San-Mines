@@ -6,12 +6,12 @@ import {
   FlatList,
   Modal,
   ScrollView,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Alert,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth, QuarryCheckOut, UnloadVerification } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input, DateTimeField, PickerField } from '../../components/ui/Input';

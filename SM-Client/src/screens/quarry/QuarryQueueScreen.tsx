@@ -8,10 +8,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useAuth, QuarryCheckIn } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';

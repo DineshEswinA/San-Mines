@@ -3,12 +3,12 @@ import {
   StyleSheet,
   Text,
   View,
-  SafeAreaView,
   TouchableOpacity,
   Modal,
   StatusBar as RNStatusBar,
   Platform,
 } from 'react-native';
+import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CheckInScreen } from './src/screens/quarry/CheckInScreen';
@@ -189,9 +189,11 @@ const MainAppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainAppContent />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <MainAppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
