@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { supabase } from '../config/supabase';
 
 // Augment Express Request interface globally to attach user info to requests cleanly
 declare global {
@@ -76,11 +77,27 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     // Resolve user role prioritizing app_metadata role claims, falling back to general role
-    const role =
+    let role =
       decoded.app_metadata?.role ||
       decoded.role ||
       decoded.user_metadata?.role ||
       'authenticated';
+
+    // If role resolves to default 'authenticated', query profiles table for custom role
+    if (role === 'authenticated') {
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', decoded.sub || decoded.id)
+          .single();
+        if (profileData && profileData.role) {
+          role = profileData.role;
+        }
+      } catch (err) {
+        console.error('Error fetching role from profiles table:', err);
+      }
+    }
 
     req.user = {
       id: decoded.sub || decoded.id,

@@ -34,6 +34,55 @@ async function getValidProfileId(userId: string | undefined): Promise<string | n
   }
 }
 
+/**
+ * Safely resolves a date string to YYYY-MM-DD format.
+ */
+function resolveDateOnly(inputDate?: string | null, defaultDate = new Date()): string {
+  if (inputDate && typeof inputDate === 'string' && inputDate.trim() !== '') {
+    const trimmedDate = inputDate.trim();
+    if (trimmedDate.includes('T')) {
+      return trimmedDate.split('T')[0];
+    }
+    if (trimmedDate.includes(' ')) {
+      return trimmedDate.split(' ')[0];
+    }
+    return trimmedDate;
+  }
+  return defaultDate.toISOString().split('T')[0];
+}
+
+/**
+ * Combines a date string and a time string (or full ISO timestamp) into a valid ISO-8601 TIMESTAMPTZ string.
+ */
+function combineDateTimeToIso(
+  inputTime?: string | null,
+  inputDate?: string | null,
+  defaultDateTime = new Date()
+): string {
+  if (!inputTime || typeof inputTime !== 'string' || inputTime.trim() === '') {
+    return defaultDateTime.toISOString();
+  }
+
+  const trimmedTime = inputTime.trim();
+
+  // If it has '-' and either 'T' or space, it is already a full timestamp/date-time
+  if (trimmedTime.includes('-') && (trimmedTime.includes('T') || trimmedTime.includes(' '))) {
+    return trimmedTime;
+  }
+
+  // It's a time-only string. Let's find the date part.
+  const datePart = resolveDateOnly(inputDate, defaultDateTime);
+
+  // Pad seconds if not present (e.g., HH:MM -> HH:MM:00)
+  let timePart = trimmedTime;
+  const parts = timePart.split(':');
+  if (parts.length === 2) {
+    timePart = `${timePart}:00`;
+  }
+
+  return `${datePart}T${timePart}.000Z`;
+}
+
 // ==========================================
 // 1. CONFIGURATION LOOKUPS (Authenticated Only)
 // ==========================================
@@ -153,15 +202,8 @@ tripsRouter.post('/checkin', requireAuth, authorizeRole(['QUARRY_OPERATOR']), as
 
   // Fallback to machine timestamps if missing from payload, keeping them editable if passed down
   const now = new Date();
-  const resolvedEntryTime =
-    quarryEntryTime && typeof quarryEntryTime === 'string' && quarryEntryTime.trim() !== ''
-      ? quarryEntryTime.trim()
-      : now.toISOString();
-
-  const resolvedEntryDate =
-    quarryEntryDate && typeof quarryEntryDate === 'string' && quarryEntryDate.trim() !== ''
-      ? quarryEntryDate.trim()
-      : now.toISOString().split('T')[0];
+  const resolvedEntryDate = resolveDateOnly(quarryEntryDate, now);
+  const resolvedEntryTime = combineDateTimeToIso(quarryEntryTime, resolvedEntryDate, now);
 
   try {
     const operatorId = await getValidProfileId(req.user?.id);
@@ -337,10 +379,7 @@ tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR'])
       });
     }
 
-    const resolvedExitTime =
-      quarryExitTime && typeof quarryExitTime === 'string' && quarryExitTime.trim() !== ''
-        ? quarryExitTime.trim()
-        : new Date().toISOString();
+    const resolvedExitTime = combineDateTimeToIso(quarryExitTime, null, new Date());
 
     // 3. Save the updated checkout transaction details
     const { data: updatedTrip, error: updateError } = await supabase
@@ -502,20 +541,9 @@ tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR']), 
     }
 
     const now = new Date();
-    const resolvedEntryTime =
-      unloadEntryTime && typeof unloadEntryTime === 'string' && unloadEntryTime.trim() !== ''
-        ? unloadEntryTime.trim()
-        : now.toISOString();
-
-    const resolvedExitTime =
-      unloadExitTime && typeof unloadExitTime === 'string' && unloadExitTime.trim() !== ''
-        ? unloadExitTime.trim()
-        : now.toISOString();
-
-    const resolvedUnloadDate =
-      unloadDate && typeof unloadDate === 'string' && unloadDate.trim() !== ''
-        ? unloadDate.trim()
-        : now.toISOString().split('T')[0];
+    const resolvedUnloadDate = resolveDateOnly(unloadDate, now);
+    const resolvedEntryTime = combineDateTimeToIso(unloadEntryTime, resolvedUnloadDate, now);
+    const resolvedExitTime = combineDateTimeToIso(unloadExitTime, resolvedUnloadDate, now);
 
     const operatorId = await getValidProfileId(req.user?.id);
 

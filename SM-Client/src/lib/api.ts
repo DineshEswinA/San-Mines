@@ -11,22 +11,22 @@ let API_BASE_URL = __DEV__
   : 'https://san-mines.vercel.app';
 
 // Auto-resolve localhost/127.0.0.1 issues for simulators and physical devices
-if (API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1')) {
-  // If running on Android Emulator, localhost maps to 10.0.2.2
-  if (Platform.OS === 'android') {
-    API_BASE_URL = API_BASE_URL.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
-  } else {
-    // Attempt to extract the dynamic packager host IP address from Expo configurations
-    const hostUri = Constants.expoConfig?.hostUri;
-    if (hostUri) {
-      const packagerIp = hostUri.split(':')[0];
-      if (packagerIp) {
-        // Swap localhost with the local machine IP address (e.g. 192.168.1.5)
-        API_BASE_URL = API_BASE_URL.replace('localhost', packagerIp).replace('127.0.0.1', packagerIp);
-      }
-    }
-  }
-}
+// if (API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1')) {
+//   // If running on Android Emulator, localhost maps to 10.0.2.2
+//   if (Platform.OS === 'android') {
+//     API_BASE_URL = API_BASE_URL.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
+//   } else {
+//     // Attempt to extract the dynamic packager host IP address from Expo configurations
+//     const hostUri = Constants.expoConfig?.hostUri;
+//     if (hostUri) {
+//       const packagerIp = hostUri.split(':')[0];
+//       if (packagerIp) {
+//         // Swap localhost with the local machine IP address (e.g. 192.168.1.5)
+//         API_BASE_URL = API_BASE_URL.replace('localhost', packagerIp).replace('127.0.0.1', packagerIp);
+//       }
+//     }
+//   }
+// }
 
 // Bridge UI Material Names to PostgreSQL Enum Value Names
 export const mapUiToApiMaterial = (material: string): string => {
@@ -73,7 +73,8 @@ export const api = {
   checkIn: async (
     vehicleNumber: string,
     transporterName: string,
-    checkinTime?: string
+    quarryEntryTime?: string,
+    quarryEntryDate?: string
   ): Promise<ApiResponse<any>> => {
     try {
       const headers = await getRequestHeaders();
@@ -83,7 +84,8 @@ export const api = {
         body: JSON.stringify({
           vehicleNumber: vehicleNumber.trim().toUpperCase(),
           transporterName: transporterName.trim(),
-          checkinTime,
+          quarryEntryTime,
+          quarryEntryDate,
         }),
       });
 

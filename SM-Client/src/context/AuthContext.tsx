@@ -70,7 +70,7 @@ interface AuthContextType {
       } | null;
     }
   ) => Promise<void>;
-  
+
   // Unload Operator specific data (Throws error if accessed by Quarry Operator)
   getIncomingFleet: () => QuarryCheckOut[];
   fetchIncomingFleet: () => Promise<void>;
@@ -84,7 +84,7 @@ interface AuthContextType {
       unloadPhoto?: string;
     }
   ) => Promise<void>;
-  
+
   // Shared / Archive (For simulation tracking/debugging or history)
   getCompletedArchives: () => UnloadVerification[];
 
@@ -179,7 +179,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [role, setRole] = useState<Role>('QUARRY_OPERATOR');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Keep separate state arrays for strict data isolation
   const [quarryQueue, setQuarryQueue] = useState<QuarryCheckIn[]>(INITIAL_QUARRY_QUEUE);
   const [transitFleet, setTransitFleet] = useState<QuarryCheckOut[]>(INITIAL_TRANSIT_FLEET);
@@ -364,7 +364,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const checkinTimeDate = new Date(trip.quarryEntryTime || trip.quarry_entry_time);
         const entryDate = checkinTimeDate.toISOString().split('T')[0];
         const entryTime = String(checkinTimeDate.getHours()).padStart(2, '0') + ':' + String(checkinTimeDate.getMinutes()).padStart(2, '0');
-        
+
         const checkoutTimeDate = new Date(trip.quarryExitTime || trip.quarry_exit_time);
         const exitTime = String(checkoutTimeDate.getHours()).padStart(2, '0') + ':' + String(checkoutTimeDate.getMinutes()).padStart(2, '0');
 
@@ -396,10 +396,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const checkInLorry = async (transporterName: string, vehicleNumber: string, date: string, time: string) => {
+    console.log({
+      vehicleNumber: vehicleNumber.trim().toUpperCase(),
+      transporterName: transporterName.trim(),
+      quarryEntryTime: time,
+      quarryEntryDate: date,
+    });
     assertQuarryAccess();
-    // Parse combined checkin timestamp into ISO standard format
+    // Parse combined checkin timestamp into ISO standard format for TIMESTAMPTZ support
     const isoDateTime = `${date}T${time}:00.000Z`;
-    const res = await api.checkIn(vehicleNumber, transporterName, isoDateTime);
+    const res = await api.checkIn(vehicleNumber, transporterName, isoDateTime, date);
     if (res.error) {
       throw new Error(res.error);
     }
@@ -485,7 +491,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const res = await api.unload(id, {
       unloadingLocationId: verificationData.unloadingLocationId,
-      userLat, 
+      userLat,
       userLng,
       unloadEntryTime: isoUnloadEntryTime,
       unloadExitTime: isoUnloadExitTime,
