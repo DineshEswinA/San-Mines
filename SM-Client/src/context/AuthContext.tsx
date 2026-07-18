@@ -43,6 +43,7 @@ interface AuthContextType {
   role: Role;
   setRole: (role: Role) => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (fullName: string, email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<{ error: string | null }>;
@@ -177,6 +178,7 @@ const INITIAL_ARCHIVES: UnloadVerification[] = [
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [role, setRole] = useState<Role>('QUARRY_OPERATOR');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Keep separate state arrays for strict data isolation
   const [quarryQueue, setQuarryQueue] = useState<QuarryCheckIn[]>(INITIAL_QUARRY_QUEUE);
@@ -201,12 +203,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Monitor session changes with active Supabase listener
   useEffect(() => {
+    let active = true;
+
     // Get initial session status on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsAuthenticated(!!session);
-      if (session) {
-        fetchConfigData();
+      if (active) {
+        setIsAuthenticated(!!session);
+        if (session) {
+          fetchConfigData().then(() => {
+            if (active) setIsLoading(false);
+          }).catch(() => {
+            if (active) setIsLoading(false);
+          });
+        } else {
+          setIsLoading(false);
+        }
       }
+    }).catch(() => {
+      if (active) setIsLoading(false);
     });
 
     // Listen for authentication changes (login, logout, refresh token)
@@ -218,6 +232,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     return () => {
+      active = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -503,6 +518,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         role,
         setRole,
         isAuthenticated,
+        isLoading,
         login,
         signUp,
         logout,

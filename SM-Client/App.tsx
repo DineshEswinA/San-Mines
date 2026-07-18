@@ -17,9 +17,11 @@ import { IncomingFleetScreen } from './src/screens/unload/IncomingFleetScreen';
 import { LoginScreen } from './src/screens/auth/LoginScreen';
 import { SignupScreen } from './src/screens/auth/SignupScreen';
 import { HardDrive, User, ChevronDown, Check, ClipboardCheck, ListFilter, LogOut } from 'lucide-react-native';
+import { SplashScreen } from './src/screens/Splash/SplashScreen';
 
 const MainAppContent: React.FC = () => {
-  const { role, setRole, isAuthenticated, logout } = useAuth();
+  const { role, setRole, isAuthenticated, logout, isLoading } = useAuth();
+  const [splashComplete, setSplashComplete] = useState(false);
   
   // Quarry Operator active tab: 'checkin' | 'queue'
   const [quarryTab, setQuarryTab] = useState<'checkin' | 'queue'>('checkin');
@@ -29,6 +31,13 @@ const MainAppContent: React.FC = () => {
 
   // Authentication mode ('login' | 'signup')
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+
+  // Show splash screen if either auth is loading OR the splash animation is still running
+  const showSplash = isLoading || !splashComplete;
+
+  if (showSplash) {
+    return <SplashScreen onAnimationComplete={() => setSplashComplete(true)} />;
+  }
 
   // If not authenticated, render Login/Signup flow
   if (!isAuthenticated) {
