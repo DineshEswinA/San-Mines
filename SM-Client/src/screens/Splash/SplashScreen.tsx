@@ -6,6 +6,7 @@ import {
   Animated,
   Dimensions,
   StatusBar,
+  Image,
 } from 'react-native';
 import Svg, {
   Path,
@@ -92,42 +93,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = () => {
 
       {/* Main Logo & Branding */}
       <View style={styles.logoContainer}>
-        {/* Double triangle SVG Logo */}
-        <Svg width={120} height={120} viewBox="0 0 100 100">
-          <Defs>
-            <LinearGradient id="leftGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#818CF8" stopOpacity={0.9} />
-              <Stop offset="100%" stopColor="#4F46E5" stopOpacity={0.2} />
-            </LinearGradient>
-            <LinearGradient id="rightGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#60A5FA" stopOpacity={0.95} />
-              <Stop offset="100%" stopColor="#2563EB" stopOpacity={0.25} />
-            </LinearGradient>
-            <RadialGradient id="glowGrad" cx="50%" cy="50%" rx="50%" ry="50%">
-              <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
-              <Stop offset="100%" stopColor="#60A5FA" stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          
-          {/* Left triangle */}
-          <Path
-            d="M 46,24 L 28,76 L 54,76 Z"
-            fill="url(#leftGrad)"
-          />
-          
-          {/* Right triangle */}
-          <Path
-            d="M 54,24 L 46,76 L 72,76 Z"
-            fill="url(#rightGrad)"
-          />
-          
-          {/* Glowing Apexes */}
-          <Circle cx={46} cy={24} r={6} fill="url(#glowGrad)" />
-          <Circle cx={46} cy={24} r={2} fill="#FFFFFF" />
-          
-          <Circle cx={54} cy={24} r={6} fill="url(#glowGrad)" />
-          <Circle cx={54} cy={24} r={2} fill="#FFFFFF" />
-        </Svg>
+        <Image
+          source={require('../../../assets/splash-icon.png')}
+          style={{ width: 140, height: 140 }}
+          resizeMode="contain"
+        />
 
         <Text style={styles.brandTitle}>SAN MINES</Text>
         <Text style={styles.brandSubtitle}>FIELD OPERATIONS SUITE</Text>

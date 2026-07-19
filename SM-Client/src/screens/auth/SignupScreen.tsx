@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
@@ -119,7 +120,11 @@ export const SignupScreen: React.FC<{ onToggleAuthMode: () => void }> = ({ onTog
           {/* Logo & Header */}
           <View style={styles.header}>
             <View style={styles.logoRow}>
-              <Globe size={32} color="#3B2FD9" style={styles.logoIcon} />
+              <Image
+                source={require('../../../assets/splash-icon.png')}
+                style={{ width: 36, height: 36, marginRight: 10 }}
+                resizeMode="contain"
+              />
               <Text style={styles.logoText}>SAN MINES</Text>
             </View>
             <Text style={styles.title}>Join the Fleet</Text>

@@ -119,6 +119,122 @@
             "description": "Restricted check requiring token with 'admin' role privileges."
           },
           "response": []
+        },
+        {
+          "name": "Get Staff Profiles",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            },
+            "description": "Retrieves all user profiles registered in the system. Restricted to SUPER_ADMIN only."
+          },
+          "response": []
+        },
+        {
+          "name": "Register New Operator",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testoperator@sanmines.com\",\n  \"password\": \"password123\",\n  \"role\": \"QUARRY_OPERATOR\",\n  \"full_name\": \"Test Operator\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            },
+            "description": "Admin endpoint to create user authentication bypassing email confirmation, inserting public profiles row. Restricted to SUPER_ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "Alter Worker Access Role",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"UNLOAD_OPERATOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/:id/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                ":id",
+                "role"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "User UUID string"
+                }
+              ]
+            },
+            "description": "Updates the profile role and auth metadata properties. Restricted to SUPER_ADMIN only."
+          },
+          "response": []
         }
       ]
     },
@@ -219,6 +335,134 @@
               ]
             },
             "description": "Returns locations table data with optional query filters."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Location Node",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Quarry Gamma Yard\",\n  \"node_type\": \"QUARRY\",\n  \"latitude\": 13.090000,\n  \"longitude\": 80.280000,\n  \"allowed_radius_meters\": 120\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/locations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "config",
+                "locations"
+              ]
+            },
+            "description": "Admin endpoint to append new yard coordinates to the Locations Registry. Restricted to SUPER_ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Material Item",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"material_name\": \"blue_metal_40mm\",\n  \"display_name\": \"Blue Metal 40mm\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/materials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "config",
+                "materials"
+              ]
+            },
+            "description": "Admin endpoint to register new material types loaded onto lorries. Restricted to SUPER_ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle Wheel Config Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{operatorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/wheel-types/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "config",
+                "wheel-types",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1",
+                  "description": "Wheel type configurations ID"
+                }
+              ]
+            },
+            "description": "Admin endpoint to activate or deactivate support for specific wheel-count models. Restricted to SUPER_ADMIN."
           },
           "response": []
         }
