@@ -16,6 +16,7 @@ CREATE TABLE public.profiles (
     id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     role user_role NOT NULL DEFAULT 'QUARRY_OPERATOR',
+    full_name TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 

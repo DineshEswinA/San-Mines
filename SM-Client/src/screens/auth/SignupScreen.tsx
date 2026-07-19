@@ -81,7 +81,7 @@ export const SignupScreen: React.FC<{ onToggleAuthMode: () => void }> = ({ onTog
 
     setErrors({});
     setLoading(true);
-    
+
     try {
       const { error } = await signUp(fullName, email, password);
       if (error) {
@@ -115,12 +115,12 @@ export const SignupScreen: React.FC<{ onToggleAuthMode: () => void }> = ({ onTog
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-          
+
           {/* Logo & Header */}
           <View style={styles.header}>
             <View style={styles.logoRow}>
               <Globe size={32} color="#3B2FD9" style={styles.logoIcon} />
-              <Text style={styles.logoText}>San Mines</Text>
+              <Text style={styles.logoText}>SAN MINES</Text>
             </View>
             <Text style={styles.title}>Join the Fleet</Text>
             <Text style={styles.subtitle}>
@@ -253,7 +253,7 @@ export const SignupScreen: React.FC<{ onToggleAuthMode: () => void }> = ({ onTog
               >
                 {agreedToTerms && <View style={styles.checkboxInner} />}
               </TouchableOpacity>
-              
+
               <Text style={styles.checkboxLabel}>
                 I agree to the{' '}
                 <Text style={styles.termsLink} onPress={() => handleTermsLink('Terms of Service')}>
@@ -300,7 +300,7 @@ export const SignupScreen: React.FC<{ onToggleAuthMode: () => void }> = ({ onTog
               <Lock size={12} color="#64748B" style={{ marginRight: 6 }} />
               <Text style={styles.footerBarText}>256-BIT AES ENCRYPTED</Text>
             </View>
-            
+
             <View style={styles.footerRight}>
               <Text style={styles.footerBarText}>NORTH HUB REGION</Text>
               <Globe size={12} color="#64748B" style={{ marginLeft: 6 }} />

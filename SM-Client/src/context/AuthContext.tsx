@@ -184,6 +184,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (active) {
+        setIsLoading(true);
         setIsAuthenticated(true);
       }
 
@@ -291,6 +292,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           id: data.user.id,
           email: email.trim(),
           role: 'QUARRY_OPERATOR',
+          full_name: fullName.trim(),
         });
       if (profileError) {
         return { error: `Auth succeeded, but profile creation failed: ${profileError.message}` };

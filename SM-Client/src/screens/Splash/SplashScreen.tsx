@@ -26,70 +26,51 @@ const STATUS_MESSAGES = [
   '🚀 Initializing Operational Workspace...',
 ];
 
-interface SplashScreenProps {
-  onAnimationComplete?: () => void;
-}
+interface SplashScreenProps {}
 
-export const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete }) => {
-  const [progress, setProgress] = useState(0);
+export const SplashScreen: React.FC<SplashScreenProps> = () => {
   const [msgIndex, setMsgIndex] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Track progress loading (2.5 seconds total)
+  // Indeterminate progress slider animation loop
   useEffect(() => {
-    const duration = 2500;
-    const intervalTime = 30; // updates every 30ms for smooth progress bar
-    const steps = duration / intervalTime;
-    const increment = 100 / steps;
+    const animation = Animated.loop(
+      Animated.timing(slideAnim, {
+        toValue: 1,
+        duration: 1800,
+        useNativeDriver: true,
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [slideAnim]);
 
+  // Cycle status messages every 2.2 seconds
+  useEffect(() => {
     const timer = setInterval(() => {
-      setProgress((prev) => {
-        const next = prev + increment;
-        if (next >= 100) {
-          clearInterval(timer);
-          // Let the 100% state display briefly, then call complete
-          setTimeout(() => {
-            if (onAnimationComplete) {
-              onAnimationComplete();
-            }
-          }, 200);
-          return 100;
-        }
-        return next;
-      });
-    }, intervalTime);
-
-    return () => clearInterval(timer);
-  }, [onAnimationComplete]);
-
-  // Transition messages gracefully based on progress milestones
-  useEffect(() => {
-    let newIndex = 0;
-    if (progress < 25) newIndex = 0;
-    else if (progress < 50) newIndex = 1;
-    else if (progress < 75) newIndex = 2;
-    else if (progress < 90) newIndex = 3;
-    else newIndex = 4;
-
-    if (newIndex !== msgIndex) {
-      // Fade out
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 180,
+        duration: 200,
         useNativeDriver: true,
       }).start(() => {
-        setMsgIndex(newIndex);
-        // Fade in
+        setMsgIndex((prev) => (prev + 1) % STATUS_MESSAGES.length);
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 180,
+          duration: 200,
           useNativeDriver: true,
         }).start();
       });
-    }
-  }, [progress, msgIndex, fadeAnim]);
+    }, 2200);
 
-  const progressPercentage = `${Math.min(Math.round(progress), 100)}%` as any;
+    return () => clearInterval(timer);
+  }, [fadeAnim]);
+
+  const trackWidth = width - 64; // container has 32px padding on each side
+  const translateX = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-60, trackWidth],
+  });
 
   return (
     <View style={styles.container}>
@@ -155,14 +136,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationComplete 
       {/* Loading Progress Bar & Cycle Status */}
       <View style={styles.loaderContainer}>
         <View style={styles.loaderHeader}>
-          <Text style={styles.loaderTitle}>LOADING</Text>
-          <Text style={styles.loaderPercent}>{Math.min(Math.round(progress), 100)}%</Text>
+          <Text style={styles.loaderTitle}>LOADING RESOURCES...</Text>
         </View>
 
         <View style={styles.track}>
-          <View style={[styles.fill, { width: progressPercentage }]}>
+          <Animated.View style={[styles.fill, { width: 60, transform: [{ translateX }] }]}>
             <View style={styles.glowDot} />
-          </View>
+          </Animated.View>
         </View>
 
         <Animated.View style={[styles.statusTextContainer, { opacity: fadeAnim }]}>
@@ -242,6 +222,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     width: '100%',
     position: 'relative',
+    overflow: 'hidden',
   },
   fill: {
     height: '100%',

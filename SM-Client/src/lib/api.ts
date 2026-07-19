@@ -252,4 +252,179 @@ export const api = {
       return { data: null, error: err.message || 'Network request failed' };
     }
   },
+
+  // 9. GET /api/users
+  getUsers: async (): Promise<ApiResponse<any[]>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/users`, {
+        method: 'GET',
+        headers,
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to retrieve users list' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text. Please ensure the backend server is running and deployed.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 10. PATCH /api/users/:id/role
+  updateUserRole: async (id: string, role: string): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/users/${id}/role`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ role }),
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to update user role' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text. Please ensure the backend server is running and deployed.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 11. POST /api/config/locations
+  createLocation: async (locationData: {
+    name: string;
+    node_type: 'QUARRY' | 'UNLOAD_SITE';
+    latitude: number;
+    longitude: number;
+    allowed_radius_meters: number;
+  }): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/locations`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(locationData),
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to create location' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text. Please ensure the backend server is running and deployed.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 12. POST /api/config/materials
+  createMaterial: async (materialData: {
+    material_name: string;
+    display_name: string;
+  }): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/materials`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(materialData),
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to create material' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text. Please ensure the backend server is running and deployed.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 13. PUT /api/config/wheel-types/:id
+  updateWheelType: async (id: number, is_active: boolean): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/wheel-types/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ is_active }),
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to update wheel type' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text. Please ensure the backend server is running and deployed.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 14. POST /api/users
+  createUser: async (userData: {
+    email: string;
+    password: string;
+    role: string;
+    full_name: string;
+  }): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/users`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(userData),
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to create user' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text. Please ensure the backend server is running and deployed.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
 };
