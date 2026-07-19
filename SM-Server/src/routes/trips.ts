@@ -116,6 +116,47 @@ configRouter.get('/wheel-types', requireAuth, async (req: Request, res: Response
 });
 
 /**
+ * @route PUT /api/config/wheel-types/:id
+ * @desc Toggle or update wheel type status (SUPER_ADMIN only)
+ */
+configRouter.put('/wheel-types/:id', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const wheelTypeId = parseInt(req.params.id as string, 10);
+  const { is_active } = req.body;
+
+  if (isNaN(wheelTypeId) || is_active === undefined) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Valid wheel type ID and is_active state are required.',
+    });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('wheel_types')
+      .update({ is_active })
+      .eq('id', wheelTypeId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to update wheel type in database.',
+        details: error.message,
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update wheel configuration.',
+      details: err.message,
+    });
+  }
+});
+
+/**
  * @route GET /api/config/materials
  * @desc Get all material types lookup list
  */
@@ -138,6 +179,49 @@ configRouter.get('/materials', requireAuth, async (req: Request, res: Response) 
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to query materials.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route POST /api/config/materials
+ * @desc Create a new material type chip (SUPER_ADMIN only)
+ */
+configRouter.post('/materials', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const { material_name, display_name } = req.body;
+
+  if (!material_name || !display_name) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Fields material_name and display_name are required.',
+    });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('materials')
+      .insert({
+        material_name,
+        display_name,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to create material in database.',
+        details: error.message,
+      });
+    }
+
+    return res.status(201).json(data);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to create material.',
       details: err.message,
     });
   }
@@ -170,6 +254,52 @@ configRouter.get('/locations', requireAuth, async (req: Request, res: Response) 
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to query locations.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route POST /api/config/locations
+ * @desc Create a new location node (SUPER_ADMIN only)
+ */
+configRouter.post('/locations', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const { name, node_type, latitude, longitude, allowed_radius_meters } = req.body;
+
+  if (!name || !node_type || latitude === undefined || longitude === undefined) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Fields name, node_type, latitude, and longitude are required.',
+    });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('locations')
+      .insert({
+        name,
+        node_type,
+        latitude,
+        longitude,
+        allowed_radius_meters: allowed_radius_meters || 100,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to create location node in database.',
+        details: error.message,
+      });
+    }
+
+    return res.status(201).json(data);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to create location.',
       details: err.message,
     });
   }

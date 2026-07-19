@@ -93,12 +93,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-          
+
           {/* Logo & Header */}
           <View style={styles.header}>
             <View style={styles.logoRow}>
               <Globe size={32} color="#3B2FD9" style={styles.logoIcon} />
-              <Text style={styles.logoText}>San Mines</Text>
+              <Text style={styles.logoText}>SAN MINES</Text>
             </View>
             <Text style={styles.title}>Welcome back, Operator</Text>
             <Text style={styles.subtitle}>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -19,10 +19,51 @@ import { LoginScreen } from './src/screens/auth/LoginScreen';
 import { SignupScreen } from './src/screens/auth/SignupScreen';
 import { HardDrive, User, ChevronDown, Check, ClipboardCheck, ListFilter, LogOut } from 'lucide-react-native';
 import { SplashScreen } from './src/screens/Splash/SplashScreen';
+import { AdminNavigator } from './src/navigation/AdminNavigator';
+import Svg, { Path, Defs, LinearGradient, RadialGradient, Stop, Circle } from 'react-native-svg';
+
+const BrandLogo: React.FC<{ size?: number }> = ({ size = 26 }) => {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Defs>
+        <LinearGradient id="headerLeftGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor="#818CF8" stopOpacity={0.9} />
+          <Stop offset="100%" stopColor="#4F46E5" stopOpacity={0.2} />
+        </LinearGradient>
+        <LinearGradient id="headerRightGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor="#60A5FA" stopOpacity={0.95} />
+          <Stop offset="100%" stopColor="#2563EB" stopOpacity={0.25} />
+        </LinearGradient>
+        <RadialGradient id="headerGlowGrad" cx="50%" cy="50%" rx="50%" ry="50%">
+          <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
+          <Stop offset="100%" stopColor="#60A5FA" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+
+      {/* Left triangle */}
+      <Path
+        d="M 46,24 L 28,76 L 54,76 Z"
+        fill="url(#headerLeftGrad)"
+      />
+
+      {/* Right triangle */}
+      <Path
+        d="M 54,24 L 46,76 L 72,76 Z"
+        fill="url(#headerRightGrad)"
+      />
+
+      {/* Glowing Apexes */}
+      <Circle cx={46} cy={24} r={6} fill="url(#headerGlowGrad)" />
+      <Circle cx={46} cy={24} r={2} fill="#FFFFFF" />
+
+      <Circle cx={54} cy={24} r={6} fill="url(#headerGlowGrad)" />
+      <Circle cx={54} cy={24} r={2} fill="#FFFFFF" />
+    </Svg>
+  );
+};
 
 const MainAppContent: React.FC = () => {
   const { role, setRole, isSuperAdmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [splashComplete, setSplashComplete] = useState(false);
 
   const handleLogoutPress = () => {
     Alert.alert(
@@ -44,11 +85,11 @@ const MainAppContent: React.FC = () => {
   // Authentication mode ('login' | 'signup')
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
 
-  // Show splash screen if either auth is loading OR the splash animation is still running
-  const showSplash = isLoading || !splashComplete;
+  // Show splash screen strictly while auth is loading or API requests are resolving
+  const showSplash = isLoading;
 
   if (showSplash) {
-    return <SplashScreen onAnimationComplete={() => setSplashComplete(true)} />;
+    return <SplashScreen />;
   }
 
   // If not authenticated, render Login/Signup flow
@@ -67,8 +108,8 @@ const MainAppContent: React.FC = () => {
       {/* 1. Mocked Top-Bar Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
-          <HardDrive size={22} color="#60A5FA" />
-          <Text style={styles.logoText}>San Mines</Text>
+          <BrandLogo size={28} />
+          <Text style={[styles.logoText, { marginLeft: 6 }]}>SAN MINES</Text>
         </View>
 
         {/* Profile Simulator Dropdown Trigger */}
@@ -158,6 +199,25 @@ const MainAppContent: React.FC = () => {
               {role === 'UNLOAD_OPERATOR' && <Check size={18} color="#16A34A" />}
             </TouchableOpacity>
 
+            {/* Super Admin selection */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setRole('SUPER_ADMIN');
+                setDropdownVisible(false);
+              }}
+              style={[
+                styles.dropdownItem,
+                role === 'SUPER_ADMIN' ? styles.dropdownItemActive : null,
+              ]}
+            >
+              <View style={styles.dropdownItemLeft}>
+                <View style={[styles.avatarDot, { backgroundColor: '#6366F1' }]} />
+                <Text style={styles.dropdownItemText}>Logged in as: Super Admin</Text>
+              </View>
+              {role === 'SUPER_ADMIN' && <Check size={18} color="#6366F1" />}
+            </TouchableOpacity>
+
             {/* Simulated Logout Selection */}
             <View style={styles.dropdownDivider} />
 
@@ -192,32 +252,13 @@ const MainAppContent: React.FC = () => {
         ) : role === 'UNLOAD_OPERATOR' ? (
           // Unloading Operator flow - Strictly isolated screen context
           <IncomingFleetScreen />
+        ) : role === 'SUPER_ADMIN' ? (
+          // Super Admin Multi-Tab Mobile Console
+          <AdminNavigator />
         ) : (
-          // Super Admin Portal Welcome Screen
+          // Fallback welcome screen or error
           <View style={styles.adminWelcomeContainer}>
-            <View style={styles.adminCard}>
-              <User size={48} color="#60A5FA" style={{ marginBottom: 16 }} />
-              <Text style={styles.adminWelcomeTitle}>Admin Portal</Text>
-              <Text style={styles.adminWelcomeSub}>
-                Select an operator context below or from the profile menu above to begin simulation.
-              </Text>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setRole('QUARRY_OPERATOR')}
-                style={[styles.adminRoleBtn, { backgroundColor: '#1E40AF', borderColor: '#3B82F6' }]}
-              >
-                <Text style={styles.adminRoleBtnText}>Simulate Quarry Operator</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => setRole('UNLOAD_OPERATOR')}
-                style={[styles.adminRoleBtn, { backgroundColor: '#16A34A', borderColor: '#4ADE80' }]}
-              >
-                <Text style={styles.adminRoleBtnText}>Simulate Unloading Operator</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.adminWelcomeTitle}>Unknown Privilege Tier</Text>
           </View>
         )}
       </View>

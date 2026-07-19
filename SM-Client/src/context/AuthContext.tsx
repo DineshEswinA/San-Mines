@@ -184,6 +184,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (active) {
+        setIsLoading(true);
         setIsAuthenticated(true);
       }
 

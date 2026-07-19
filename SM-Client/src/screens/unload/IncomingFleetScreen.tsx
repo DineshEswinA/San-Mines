@@ -246,36 +246,6 @@ export const IncomingFleetScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Tab Switcher inside Unloading workspace */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            setActiveSubTab('incoming');
-            reloadData();
-          }}
-          style={[styles.tabItem, activeSubTab === 'incoming' ? styles.tabItemActive : null]}
-        >
-          <Route size={18} color={activeSubTab === 'incoming' ? '#16A34A' : '#6B7280'} />
-          <Text style={[styles.tabText, activeSubTab === 'incoming' ? styles.tabTextActive : null]}>
-            Incoming Fleet ({incomingList.length})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            setActiveSubTab('history');
-            reloadData();
-          }}
-          style={[styles.tabItem, activeSubTab === 'history' ? styles.tabItemActive : null]}
-        >
-          <History size={18} color={activeSubTab === 'history' ? '#16A34A' : '#6B7280'} />
-          <Text style={[styles.tabText, activeSubTab === 'history' ? styles.tabTextActive : null]}>
-            Unload Archive ({historyList.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       {/* SearchBar Filter */}
       {!loading && (
@@ -471,6 +441,37 @@ export const IncomingFleetScreen: React.FC = () => {
           </SafeAreaView>
         </Modal>
       )}
+
+      {/* Tab Switcher inside Unloading workspace (Bottom placement) */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            setActiveSubTab('incoming');
+            reloadData();
+          }}
+          style={[styles.tabItem, activeSubTab === 'incoming' ? styles.tabItemActive : null]}
+        >
+          <Route size={20} color={activeSubTab === 'incoming' ? '#16A34A' : '#6B7280'} />
+          <Text style={[styles.tabText, activeSubTab === 'incoming' ? styles.tabTextActive : null]}>
+            Incoming Fleet ({incomingList.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            setActiveSubTab('history');
+            reloadData();
+          }}
+          style={[styles.tabItem, activeSubTab === 'history' ? styles.tabItemActive : null]}
+        >
+          <History size={20} color={activeSubTab === 'history' ? '#16A34A' : '#6B7280'} />
+          <Text style={[styles.tabText, activeSubTab === 'history' ? styles.tabTextActive : null]}>
+            Unload Archive ({historyList.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -493,27 +494,23 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    height: 52, // >= 48px touch target
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#E5E7EB',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+    paddingTop: 10,
   },
   tabItem: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
+    justifyContent: 'center',
   },
-  tabItemActive: {
-    borderBottomColor: '#16A34A', // Safety Green theme for unload
-  },
+  tabItemActive: {},
   tabText: {
-    fontSize: 13,
-    fontWeight: 'bold',
+    fontSize: 10,
+    fontWeight: '600',
     color: '#6B7280',
-    marginLeft: 6,
+    marginTop: 4,
   },
   tabTextActive: {
     color: '#16A34A',
@@ -631,7 +628,7 @@ const styles = StyleSheet.create({
   },
   // Empty states
   emptyContainer: {
-    flex: 0.6,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
