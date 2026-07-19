@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Switch,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
@@ -20,6 +21,29 @@ export const MasterConfigScreen: React.FC = () => {
   const { locations, materials, wheelTypes, fetchConfigData } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'LOCATIONS' | 'MATERIALS' | 'WHEELS'>('LOCATIONS');
   const [loading, setLoading] = useState(false);
+
+  const { width: screenWidth } = Dimensions.get('window');
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const handleScrollEnd = (event: any) => {
+    const contentOffset = event.nativeEvent.contentOffset.x;
+    const pageIndex = Math.round(contentOffset / screenWidth);
+    if (pageIndex === 0) {
+      setActiveSubTab('LOCATIONS');
+    } else if (pageIndex === 1) {
+      setActiveSubTab('MATERIALS');
+    } else if (pageIndex === 2) {
+      setActiveSubTab('WHEELS');
+    }
+  };
+
+  const handleTabPress = (tab: 'LOCATIONS' | 'MATERIALS' | 'WHEELS') => {
+    setActiveSubTab(tab);
+    let pageIndex = 0;
+    if (tab === 'MATERIALS') pageIndex = 1;
+    if (tab === 'WHEELS') pageIndex = 2;
+    scrollViewRef.current?.scrollTo({ x: pageIndex * screenWidth, animated: true });
+  };
 
   // Locations State
   const [locModalVisible, setLocModalVisible] = useState(false);
@@ -144,7 +168,7 @@ export const MasterConfigScreen: React.FC = () => {
       <View style={styles.subTabContainer}>
         <TouchableOpacity
           style={[styles.subTab, activeSubTab === 'LOCATIONS' && styles.subTabActive]}
-          onPress={() => setActiveSubTab('LOCATIONS')}
+          onPress={() => handleTabPress('LOCATIONS')}
         >
           <MapPin size={16} color={activeSubTab === 'LOCATIONS' ? '#6366F1' : '#94A3B8'} style={{ marginRight: 6 }} />
           <Text style={[styles.subTabText, activeSubTab === 'LOCATIONS' && styles.subTabTextActive]}>
@@ -154,7 +178,7 @@ export const MasterConfigScreen: React.FC = () => {
 
         <TouchableOpacity
           style={[styles.subTab, activeSubTab === 'MATERIALS' && styles.subTabActive]}
-          onPress={() => setActiveSubTab('MATERIALS')}
+          onPress={() => handleTabPress('MATERIALS')}
         >
           <Layers size={16} color={activeSubTab === 'MATERIALS' ? '#6366F1' : '#94A3B8'} style={{ marginRight: 6 }} />
           <Text style={[styles.subTabText, activeSubTab === 'MATERIALS' && styles.subTabTextActive]}>
@@ -164,7 +188,7 @@ export const MasterConfigScreen: React.FC = () => {
 
         <TouchableOpacity
           style={[styles.subTab, activeSubTab === 'WHEELS' && styles.subTabActive]}
-          onPress={() => setActiveSubTab('WHEELS')}
+          onPress={() => handleTabPress('WHEELS')}
         >
           <Disc size={16} color={activeSubTab === 'WHEELS' ? '#6366F1' : '#94A3B8'} style={{ marginRight: 6 }} />
           <Text style={[styles.subTabText, activeSubTab === 'WHEELS' && styles.subTabTextActive]}>
@@ -173,11 +197,18 @@ export const MasterConfigScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Main Configurations Section */}
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* SUBTAB 1: LOCATIONS CONFIGURATION */}
-        {activeSubTab === 'LOCATIONS' && (
-          <View>
+      {/* Main Configurations Section (Swipable Pager) */}
+      <ScrollView
+        ref={scrollViewRef}
+        horizontal={true}
+        pagingEnabled={true}
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleScrollEnd}
+        style={{ flex: 1 }}
+      >
+        {/* PANEL 1: LOCATIONS */}
+        <View style={{ width: screenWidth }}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Active Yards Registry</Text>
               <Text style={styles.sectionSubtitle}>Locations where GPS checks are run</Text>
@@ -202,12 +233,12 @@ export const MasterConfigScreen: React.FC = () => {
                 </View>
               </View>
             ))}
-          </View>
-        )}
+          </ScrollView>
+        </View>
 
-        {/* SUBTAB 2: MATERIALS CONFIGURATION */}
-        {activeSubTab === 'MATERIALS' && (
-          <View>
+        {/* PANEL 2: MATERIALS */}
+        <View style={{ width: screenWidth }}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Ecosystem Materials Registry</Text>
               <Text style={styles.sectionSubtitle}>Material chips loaded on outbound lorries</Text>
@@ -241,12 +272,12 @@ export const MasterConfigScreen: React.FC = () => {
                 style={styles.appendBtn}
               />
             </View>
-          </View>
-        )}
+          </ScrollView>
+        </View>
 
-        {/* SUBTAB 3: WHEEL CONFIGURATION */}
-        {activeSubTab === 'WHEELS' && (
-          <View>
+        {/* PANEL 3: WHEELS */}
+        <View style={{ width: screenWidth }}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Vehicle Classes Registry</Text>
               <Text style={styles.sectionSubtitle}>Instantly activate or deactivate wheel count configurations</Text>
@@ -273,8 +304,8 @@ export const MasterConfigScreen: React.FC = () => {
                 </View>
               </View>
             ))}
-          </View>
-        )}
+          </ScrollView>
+        </View>
       </ScrollView>
 
       {/* Floating Action Button */}
