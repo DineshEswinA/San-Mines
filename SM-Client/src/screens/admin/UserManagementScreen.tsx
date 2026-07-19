@@ -8,16 +8,87 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { User, Shield, Check, RefreshCw } from 'lucide-react-native';
+import { User, Shield, Check, RefreshCw, UserPlus, X } from 'lucide-react-native';
+import { Input, PickerField } from '../../components/ui/Input';
+import { Button } from '../../components/ui/Button';
 
 export const UserManagementScreen: React.FC = () => {
   const { role: currentUserRole, logout } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [mutatingUserId, setMutatingUserId] = useState<string | null>(null);
+
+  // User creation states
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState<'QUARRY_OPERATOR' | 'UNLOAD_OPERATOR' | 'SUPER_ADMIN'>('QUARRY_OPERATOR');
+  const [createLoading, setCreateLoading] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  const handleCreateUser = async () => {
+    const newErrors: { [key: string]: string } = {};
+
+    if (!newName.trim()) {
+      newErrors.name = 'Full name is required';
+    }
+
+    if (!newEmail.trim()) {
+      newErrors.email = 'Email address is required';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newEmail.trim())) {
+        newErrors.email = 'Please enter a valid email address';
+      }
+    }
+
+    if (!newPassword) {
+      newErrors.password = 'Password is required';
+    } else if (newPassword.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
+    setCreateLoading(true);
+    try {
+      const res = await api.createUser({
+        email: newEmail.trim(),
+        password: newPassword,
+        role: newRole,
+        full_name: newName.trim(),
+      });
+
+      if (res.error) {
+        Alert.alert('Registration Failed', res.error);
+      } else {
+        Alert.alert('Success', `Account for "${newName}" has been registered successfully.`);
+        setCreateModalVisible(false);
+        // Reset inputs
+        setNewName('');
+        setNewEmail('');
+        setNewPassword('');
+        setNewRole('QUARRY_OPERATOR');
+        setErrors({});
+        // Refresh roster
+        await fetchUsers();
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'An unexpected error occurred.');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -220,6 +291,103 @@ export const UserManagementScreen: React.FC = () => {
           <Text style={styles.disconnectBtnText}>Secure Disconnect Console</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => setCreateModalVisible(true)}
+        style={styles.fab}
+      >
+        <UserPlus size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Modal: Add New Staff Member */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={createModalVisible}
+        onRequestClose={() => setCreateModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Register New Operator</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setCreateModalVisible(false);
+                  setErrors({});
+                }}
+                style={styles.closeBtn}
+              >
+                <X size={20} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalForm}>
+              <Input
+                label="Full Name"
+                placeholder="e.g. John Doe"
+                value={newName}
+                onChangeText={(text) => {
+                  setNewName(text);
+                  if (errors.name) {
+                    setErrors((prev) => ({ ...prev, name: '' }));
+                  }
+                }}
+                required={true}
+                error={errors.name}
+              />
+
+              <Input
+                label="Email Address"
+                placeholder="e.g. john@sanmines.com"
+                value={newEmail}
+                onChangeText={(text) => {
+                  setNewEmail(text);
+                  if (errors.email) {
+                    setErrors((prev) => ({ ...prev, email: '' }));
+                  }
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                required={true}
+                error={errors.email}
+              />
+
+              <Input
+                label="Password"
+                placeholder="Minimum 6 characters"
+                value={newPassword}
+                onChangeText={(text) => {
+                  setNewPassword(text);
+                  if (errors.password) {
+                    setErrors((prev) => ({ ...prev, password: '' }));
+                  }
+                }}
+                secureTextEntry={true}
+                required={true}
+                error={errors.password}
+              />
+
+              <PickerField
+                label="Assigned System Privilege"
+                options={['QUARRY_OPERATOR', 'UNLOAD_OPERATOR', 'SUPER_ADMIN']}
+                selectedValue={newRole}
+                onValueChange={(val: any) => setNewRole(val as any)}
+                required={true}
+              />
+
+              <Button
+                title="Create Account"
+                loading={createLoading}
+                variant="primary"
+                onPress={handleCreateUser}
+                style={styles.submitBtn}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -419,5 +587,67 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 96,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(9, 13, 26, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 440,
+    maxHeight: '90%',
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+    paddingBottom: 14,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#F8FAFC',
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  modalForm: {
+    gap: 16,
+    paddingBottom: 20,
+  },
+  submitBtn: {
+    marginTop: 10,
   },
 });

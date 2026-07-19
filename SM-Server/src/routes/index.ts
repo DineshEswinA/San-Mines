@@ -40,6 +40,86 @@ router.get('/users', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Re
 });
 
 /**
+ * @route POST /api/users
+ * @desc Admin-level user creation bypassing email confirmation (SUPER_ADMIN only)
+ */
+router.post('/users', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const { email, password, role, full_name } = req.body;
+
+  if (!email || !password || !role || !full_name) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'All fields (email, password, role, full_name) are required.',
+    });
+  }
+
+  if (!['QUARRY_OPERATOR', 'UNLOAD_OPERATOR', 'SUPER_ADMIN'].includes(role)) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Invalid role value. Must be QUARRY_OPERATOR, UNLOAD_OPERATOR, or SUPER_ADMIN.',
+    });
+  }
+
+  try {
+    // 1. Create the user in Supabase Auth using the administrative Service Role client
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: email.trim(),
+      password: password,
+      email_confirm: true, // Bypasses email confirmation completely!
+      user_metadata: { full_name: full_name.trim(), role },
+      app_metadata: { role },
+    });
+
+    if (authError || !authData.user) {
+      return res.status(500).json({
+        error: 'Authentication Error',
+        message: 'Failed to create auth credentials.',
+        details: authError?.message,
+      });
+    }
+
+    // 2. Create the profile row in the public.profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: authData.user.id,
+        email: email.trim(),
+        role: role,
+        full_name: full_name.trim(),
+      })
+      .select()
+      .single();
+
+    if (profileError) {
+      // Clean up created auth user if profile insert fails to prevent orphaned auth accounts
+      await supabase.auth.admin.deleteUser(authData.user.id);
+      
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to create public user profile.',
+        details: profileError.message,
+      });
+    }
+
+    return res.status(201).json({
+      message: 'User created successfully.',
+      user: {
+        id: authData.user.id,
+        email: authData.user.email,
+        role: profile.role,
+        full_name: profile.full_name,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to complete user registration.',
+      details: err.message,
+    });
+  }
+});
+
+/**
  * @route PATCH /api/users/:id/role
  * @desc Update user role in profiles table and Supabase auth metadata (SUPER_ADMIN only)
  */

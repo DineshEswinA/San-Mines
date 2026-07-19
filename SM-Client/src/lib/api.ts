@@ -395,4 +395,36 @@ export const api = {
       return { data: null, error: err.message || 'Network request failed' };
     }
   },
+
+  // 14. POST /api/users
+  createUser: async (userData: {
+    email: string;
+    password: string;
+    role: string;
+    full_name: string;
+  }): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/users`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(userData),
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to create user' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text. Please ensure the backend server is running and deployed.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
 };
