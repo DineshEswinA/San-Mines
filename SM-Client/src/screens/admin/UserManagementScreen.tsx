@@ -87,6 +87,9 @@ export const UserManagementScreen: React.FC = () => {
               <User size={20} color="#6366F1" />
             </View>
             <View style={{ flex: 1 }}>
+              <Text numberOfLines={1} style={styles.nameText}>
+                {item.full_name || 'Unnamed Operator'}
+              </Text>
               <Text numberOfLines={1} style={styles.emailText}>
                 {item.email}
               </Text>
@@ -294,14 +297,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
-  emailText: {
+  nameText: {
     color: '#F1F5F9',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
+  },
+  emailText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 1,
   },
   userIdText: {
     color: '#64748B',
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 1,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
