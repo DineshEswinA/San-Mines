@@ -130,8 +130,9 @@ export const MasterConfigScreen: React.FC = () => {
 
       if (res.error) throw new Error(res.error);
 
-      if (res.data && res.data.location) {
-        addLocationState(res.data.location);
+      const createdObj = res.data?.location || res.data;
+      if (createdObj) {
+        addLocationState(createdObj);
       }
 
       Alert.alert('Success', `Location "${locName}" created successfully.`);
@@ -186,8 +187,9 @@ export const MasterConfigScreen: React.FC = () => {
 
       if (res.error) throw new Error(res.error);
 
-      if (res.data && res.data.location) {
-        updateLocationState(selectedLocId, res.data.location);
+      const updatedObj = res.data?.location || res.data;
+      if (updatedObj) {
+        updateLocationState(selectedLocId, updatedObj);
       }
 
       Alert.alert('Success', `Location "${editLocName}" updated successfully.`);
@@ -251,8 +253,9 @@ export const MasterConfigScreen: React.FC = () => {
 
       if (res.error) throw new Error(res.error);
 
-      if (res.data && res.data.material) {
-        addMaterialState(res.data.material);
+      const createdObj = res.data?.material || res.data;
+      if (createdObj) {
+        addMaterialState(createdObj);
       }
 
       Alert.alert('Success', `Material "${newMaterialName}" appended successfully.`);
@@ -292,8 +295,9 @@ export const MasterConfigScreen: React.FC = () => {
 
       if (res.error) throw new Error(res.error);
 
-      if (res.data && res.data.material) {
-        updateMaterialState(selectedMatId, res.data.material);
+      const updatedObj = res.data?.material || res.data;
+      if (updatedObj) {
+        updateMaterialState(selectedMatId, updatedObj);
       }
 
       Alert.alert('Success', `Material updated to "${editMatDisplayName}".`);
@@ -376,8 +380,9 @@ export const MasterConfigScreen: React.FC = () => {
 
       if (res.error) throw new Error(res.error);
 
-      if (res.data && res.data.wheel_type) {
-        addWheelTypeState(res.data.wheel_type);
+      const createdObj = res.data?.wheel_type || res.data;
+      if (createdObj) {
+        addWheelTypeState(createdObj);
       }
 
       Alert.alert('Success', `Lorry Class "${newWheelLabel}" appended successfully.`);
@@ -420,8 +425,9 @@ export const MasterConfigScreen: React.FC = () => {
 
       if (res.error) throw new Error(res.error);
 
-      if (res.data && res.data.wheel_type) {
-        updateWheelTypeState(selectedWheelId, res.data.wheel_type);
+      const updatedObj = res.data?.wheel_type || res.data;
+      if (updatedObj) {
+        updateWheelTypeState(selectedWheelId, updatedObj);
       }
 
       Alert.alert('Success', `Lorry class updated to "${editWheelLabel}".`);

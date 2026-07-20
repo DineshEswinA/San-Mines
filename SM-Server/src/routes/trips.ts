@@ -449,7 +449,7 @@ configRouter.put('/locations/:id', requireAuth, authorizeRole(['SUPER_ADMIN']), 
       });
     }
 
-    return res.json(data);
+    return res.json({ message: 'Location node updated successfully.', location: data, ...data });
   } catch (err: any) {
     return res.status(500).json({
       error: 'Internal Server Error',
