@@ -10,6 +10,7 @@ import {
   Platform,
   Modal,
   ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
@@ -308,7 +309,10 @@ export const UserManagementScreen: React.FC = () => {
         visible={createModalVisible}
         onRequestClose={() => setCreateModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Register New Operator</Text>
@@ -323,7 +327,12 @@ export const UserManagementScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalForm}>
+            <ScrollView
+              style={{ flexGrow: 0, flexShrink: 1 }}
+              contentContainerStyle={styles.modalForm}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               <Input
                 label="Full Name"
                 placeholder="e.g. John Doe"
@@ -336,6 +345,7 @@ export const UserManagementScreen: React.FC = () => {
                 }}
                 required={true}
                 error={errors.name}
+                labelStyle={{ color: '#94A3B8' }}
               />
 
               <Input
@@ -352,6 +362,7 @@ export const UserManagementScreen: React.FC = () => {
                 autoCapitalize="none"
                 required={true}
                 error={errors.email}
+                labelStyle={{ color: '#94A3B8' }}
               />
 
               <Input
@@ -367,26 +378,43 @@ export const UserManagementScreen: React.FC = () => {
                 secureTextEntry={true}
                 required={true}
                 error={errors.password}
+                labelStyle={{ color: '#94A3B8' }}
               />
 
               <PickerField
                 label="Assigned System Privilege"
-                options={['QUARRY_OPERATOR', 'UNLOAD_OPERATOR', 'SUPER_ADMIN']}
-                selectedValue={newRole}
-                onValueChange={(val: any) => setNewRole(val as any)}
+                options={['Quarry Operator', 'Unload Operator', 'Super Admin']}
+                selectedValue={
+                  newRole === 'QUARRY_OPERATOR'
+                    ? 'Quarry Operator'
+                    : newRole === 'UNLOAD_OPERATOR'
+                    ? 'Unload Operator'
+                    : 'Super Admin'
+                }
+                onValueChange={(val: any) => {
+                  const roleMap: Record<string, string> = {
+                    'Quarry Operator': 'QUARRY_OPERATOR',
+                    'Unload Operator': 'UNLOAD_OPERATOR',
+                    'Super Admin': 'SUPER_ADMIN',
+                  };
+                  setNewRole(roleMap[val] as any);
+                }}
                 required={true}
+                labelStyle={{ color: '#94A3B8' }}
               />
 
               <Button
                 title="Create Account"
+                loadingTitle="Creating Account..."
                 loading={createLoading}
+                disabled={createLoading}
                 variant="primary"
                 onPress={handleCreateUser}
                 style={styles.submitBtn}
               />
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

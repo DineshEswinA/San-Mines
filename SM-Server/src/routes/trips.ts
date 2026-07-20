@@ -121,19 +121,24 @@ configRouter.get('/wheel-types', requireAuth, async (req: Request, res: Response
  */
 configRouter.put('/wheel-types/:id', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
   const wheelTypeId = parseInt(req.params.id as string, 10);
-  const { is_active } = req.body;
+  const { is_active, wheel_count, display_label } = req.body;
 
-  if (isNaN(wheelTypeId) || is_active === undefined) {
+  if (isNaN(wheelTypeId)) {
     return res.status(400).json({
       error: 'Bad Request',
-      message: 'Valid wheel type ID and is_active state are required.',
+      message: 'Valid wheel type ID is required.',
     });
   }
 
   try {
+    const updatePayload: any = {};
+    if (is_active !== undefined) updatePayload.is_active = is_active;
+    if (wheel_count !== undefined) updatePayload.wheel_count = parseInt(wheel_count as any, 10);
+    if (display_label !== undefined) updatePayload.display_label = display_label;
+
     const { data, error } = await supabase
       .from('wheel_types')
-      .update({ is_active })
+      .update(updatePayload)
       .eq('id', wheelTypeId)
       .select()
       .single();
@@ -151,6 +156,106 @@ configRouter.put('/wheel-types/:id', requireAuth, authorizeRole(['SUPER_ADMIN'])
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to update wheel configuration.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/config/wheel-types/:id
+ * @desc Delete a wheel type configuration (SUPER_ADMIN only)
+ */
+configRouter.delete('/wheel-types/:id', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const wheelTypeId = parseInt(req.params.id as string, 10);
+
+  if (isNaN(wheelTypeId)) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Valid wheel type ID is required.',
+    });
+  }
+
+  try {
+    const { data: refTrips } = await supabase
+      .from('trips')
+      .select('id')
+      .eq('wheel_type_id', wheelTypeId)
+      .limit(1);
+
+    if (refTrips && refTrips.length > 0) {
+      return res.status(409).json({
+        error: 'Conflict',
+        message: 'Cannot delete wheel type configuration: It is referenced by active or historic trips.',
+      });
+    }
+
+    const { error } = await supabase
+      .from('wheel_types')
+      .delete()
+      .eq('id', wheelTypeId);
+
+    if (error) {
+      if (error.code === '23503') {
+        return res.status(409).json({
+          error: 'Conflict',
+          message: 'Cannot delete wheel type configuration: It is referenced by active or historic trips.',
+        });
+      }
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to delete wheel type configuration from database.',
+        details: error.message,
+      });
+    }
+
+    return res.json({ message: 'Wheel type configuration deleted successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to delete wheel configuration.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route POST /api/config/wheel-types
+ * @desc Create a new wheel type configuration (SUPER_ADMIN only)
+ */
+configRouter.post('/wheel-types', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const { wheel_count, display_label } = req.body;
+
+  if (wheel_count === undefined || !display_label) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Fields wheel_count and display_label are required.',
+    });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('wheel_types')
+      .insert({
+        wheel_count: parseInt(wheel_count as any, 10),
+        display_label,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to create wheel type in database.',
+        details: error.message,
+      });
+    }
+
+    return res.status(201).json(data);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to create wheel type.',
       details: err.message,
     });
   }
@@ -300,6 +405,215 @@ configRouter.post('/locations', requireAuth, authorizeRole(['SUPER_ADMIN']), asy
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to create location.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route PUT /api/config/locations/:id
+ * @desc Edit an existing location node (SUPER_ADMIN only)
+ */
+configRouter.put('/locations/:id', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const locId = parseInt(req.params.id as string, 10);
+  const { name, node_type, latitude, longitude, allowed_radius_meters, is_active } = req.body;
+
+  if (isNaN(locId)) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Valid location ID is required.',
+    });
+  }
+
+  try {
+    const updatePayload: any = {};
+    if (name !== undefined) updatePayload.name = name;
+    if (node_type !== undefined) updatePayload.node_type = node_type;
+    if (latitude !== undefined) updatePayload.latitude = latitude;
+    if (longitude !== undefined) updatePayload.longitude = longitude;
+    if (allowed_radius_meters !== undefined) updatePayload.allowed_radius_meters = allowed_radius_meters;
+    if (is_active !== undefined) updatePayload.is_active = is_active;
+
+    const { data, error } = await supabase
+      .from('locations')
+      .update(updatePayload)
+      .eq('id', locId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to update location node in database.',
+        details: error.message,
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update location.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/config/locations/:id
+ * @desc Delete a location node (SUPER_ADMIN only)
+ */
+configRouter.delete('/locations/:id', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const locId = parseInt(req.params.id as string, 10);
+
+  if (isNaN(locId)) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Valid location ID is required.',
+    });
+  }
+
+  try {
+    const { data: refTrips } = await supabase
+      .from('trips')
+      .select('id')
+      .or(`dispatch_location_id.eq.${locId},unloading_location_id.eq.${locId}`)
+      .limit(1);
+
+    if (refTrips && refTrips.length > 0) {
+      return res.status(409).json({
+        error: 'Conflict',
+        message: 'Cannot delete location node: It is referenced by active or historic trips.',
+      });
+    }
+
+    const { error } = await supabase
+      .from('locations')
+      .delete()
+      .eq('id', locId);
+
+    if (error) {
+      if (error.code === '23503') {
+        return res.status(409).json({
+          error: 'Conflict',
+          message: 'Cannot delete location node: It is referenced by active or historic trips.',
+        });
+      }
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to delete location node from database.',
+        details: error.message,
+      });
+    }
+
+    return res.json({ message: 'Location node deleted successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to delete location.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route PUT /api/config/materials/:id
+ * @desc Edit an existing material chip (SUPER_ADMIN only)
+ */
+configRouter.put('/materials/:id', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const matId = parseInt(req.params.id as string, 10);
+  const { material_name, display_name, is_active } = req.body;
+
+  if (isNaN(matId)) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Valid material ID is required.',
+    });
+  }
+
+  try {
+    const updatePayload: any = {};
+    if (material_name !== undefined) updatePayload.material_name = material_name;
+    if (display_name !== undefined) updatePayload.display_name = display_name;
+    if (is_active !== undefined) updatePayload.is_active = is_active;
+
+    const { data, error } = await supabase
+      .from('materials')
+      .update(updatePayload)
+      .eq('id', matId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to update material in database.',
+        details: error.message,
+      });
+    }
+
+    return res.json(data);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update material.',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/config/materials/:id
+ * @desc Delete a material chip (SUPER_ADMIN only)
+ */
+configRouter.delete('/materials/:id', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Request, res: Response) => {
+  const matId = parseInt(req.params.id as string, 10);
+
+  if (isNaN(matId)) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Valid material ID is required.',
+    });
+  }
+
+  try {
+    const { data: refTrips } = await supabase
+      .from('trips')
+      .select('id')
+      .eq('material_id', matId)
+      .limit(1);
+
+    if (refTrips && refTrips.length > 0) {
+      return res.status(409).json({
+        error: 'Conflict',
+        message: 'Cannot delete material chip: It is referenced by active or historic trips.',
+      });
+    }
+
+    const { error } = await supabase
+      .from('materials')
+      .delete()
+      .eq('id', matId);
+
+    if (error) {
+      if (error.code === '23503') {
+        return res.status(409).json({
+          error: 'Conflict',
+          message: 'Cannot delete material chip: It is referenced by active or historic trips.',
+        });
+      }
+      return res.status(500).json({
+        error: 'Database Error',
+        message: 'Failed to delete material chip from database.',
+        details: error.message,
+      });
+    }
+
+    return res.json({ message: 'Material chip deleted successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to delete material.',
       details: err.message,
     });
   }
@@ -729,14 +1043,12 @@ tripsRouter.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
     let query = supabase.from('trips').select('*', { count: 'exact' });
 
-    if (userRole === 'QUARRY_OPERATOR') {
+    if (status && typeof status === 'string') {
+      query = query.eq('status', status);
+    } else if (userRole === 'QUARRY_OPERATOR') {
       query = query.eq('status', 'INSIDE_QUARRY');
     } else if (userRole === 'UNLOAD_OPERATOR') {
-      query = query.eq('status', 'IN_TRANSIT');
-    } else {
-      if (status && typeof status === 'string') {
-        query = query.eq('status', status);
-      }
+      query = query.in('status', ['IN_TRANSIT', 'UNLOADED']);
     }
 
     const { data, error, count } = await query.order('created_at', { ascending: false });

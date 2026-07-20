@@ -11,6 +11,8 @@ import {
   Alert,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth, QuarryCheckOut, UnloadVerification, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
@@ -30,19 +32,15 @@ export const IncomingFleetScreen: React.FC = () => {
     fetchConfigData
   } = useAuth();
 
-  // Filter only unload site locations
   const unloadLocations = locations.filter(l => l.node_type === 'UNLOAD_SITE');
 
-  // Selected tab inside Unload Operator screen: 'incoming' or 'history'
   const [activeSubTab, setActiveSubTab] = useState<'incoming' | 'history'>('incoming');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Lists from context
   const incomingList = getIncomingFleet();
   const historyList = getCompletedArchives();
 
-  // Filter lists based on Search Query
   const filteredIncomingList = incomingList.filter((item) => {
     const matchSearch =
       searchQuery.trim() === '' ||
@@ -63,33 +61,47 @@ export const IncomingFleetScreen: React.FC = () => {
   const [selectedLorry, setSelectedLorry] = useState<QuarryCheckOut | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Form Fields for DB config IDs
-  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
-  const [selectedLocationName, setSelectedLocationName] = useState('');
+  // Detail Viewer Modal State
+  const [detailLorry, setDetailLorry] = useState<UnloadVerification | null>(null);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
 
   // Form Fields
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+  const [selectedLocationName, setSelectedLocationName] = useState('');
   const [unloadDate, setUnloadDate] = useState('');
   const [unloadEntryTime, setUnloadEntryTime] = useState('');
-  const [unloadExitTime, setUnloadExitTime] = useState('');
   const [unloadPhoto, setUnloadPhoto] = useState<string | undefined>(undefined);
+  const [submitLoading, setSubmitLoading] = useState(false);
 
-  // Form Validation Errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  const [refreshing, setRefreshing] = useState(false);
 
   const reloadData = async () => {
     setLoading(true);
     try {
       await fetchIncomingFleet();
     } catch (e) {
-      // Handle error gracefully
+      // Handle gracefully
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchIncomingFleet();
+      await fetchConfigData(true);
+    } catch (e) {
+      console.error('Failed to refresh incoming fleet data:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     reloadData();
-    // Load config tables if they haven't been loaded
     if (locations.length === 0) {
       fetchConfigData();
     }
@@ -98,7 +110,6 @@ export const IncomingFleetScreen: React.FC = () => {
   const handleOpenVerify = (lorry: QuarryCheckOut) => {
     setSelectedLorry(lorry);
 
-    // Initialize date and times
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -108,16 +119,10 @@ export const IncomingFleetScreen: React.FC = () => {
     const entryHours = String(now.getHours()).padStart(2, '0');
     const entryMinutes = String(now.getMinutes()).padStart(2, '0');
 
-    // Set exit time slightly later for realism, say +15 mins
-    const exitTimeObj = new Date(now.getTime() + 15 * 60000);
-    const exitHours = String(exitTimeObj.getHours()).padStart(2, '0');
-    const exitMinutes = String(exitTimeObj.getMinutes()).padStart(2, '0');
-
     setUnloadDate(dateStr);
     setUnloadEntryTime(`${entryHours}:${entryMinutes}`);
     setSelectedLocationId(null);
     setSelectedLocationName('');
-    setUnloadExitTime(`${exitHours}:${exitMinutes}`);
     setUnloadPhoto(undefined);
     setErrors({});
 
@@ -126,40 +131,30 @@ export const IncomingFleetScreen: React.FC = () => {
 
   const handleVerifySubmit = async () => {
     if (!selectedLorry) return;
-
     const newErrors: { [key: string]: string } = {};
 
     if (!selectedLocationId) {
       newErrors.unloadingLocation = 'Unloading site location is required';
     }
-
     if (!unloadDate.trim()) {
       newErrors.unloadDate = 'Unload date is required';
     }
-
     if (!unloadEntryTime.trim()) {
       newErrors.unloadEntryTime = 'Unload entry time is required';
     }
-
-    if (!unloadExitTime.trim()) {
-      newErrors.unloadExitTime = 'Unload exit time is required';
-    }
-
-    // if (!unloadPhoto) {
-    //   newErrors.unloadPhoto = 'Unload security photo capture is required';
-    // }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
+    setSubmitLoading(true);
+
     try {
       await verifyAndCloseTrip(selectedLorry.id, {
         unloadDate,
         unloadEntryTime,
         unloadingLocationId: selectedLocationId!,
-        unloadExitTime,
         unloadPhoto,
       });
 
@@ -174,6 +169,8 @@ export const IncomingFleetScreen: React.FC = () => {
       );
     } catch (err: any) {
       Alert.alert('Verification Failed', err.message || 'An unexpected error occurred while closing the trip.');
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
@@ -181,7 +178,7 @@ export const IncomingFleetScreen: React.FC = () => {
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.vehicleRow}>
-          <Truck size={18} color="#16A34A" />
+          <Truck size={18} color="#818CF8" />
           <Text style={styles.vehicleNo}>{item.vehicleNumber}</Text>
         </View>
         <View style={styles.tripIdBadge}>
@@ -205,7 +202,7 @@ export const IncomingFleetScreen: React.FC = () => {
           Transporter: <Text style={styles.footerValue}>{item.transporterName}</Text>
         </Text>
         <Text style={styles.footerLabel}>
-          Dispatched from Quarry: <Text style={styles.footerValue}>{formatDateOnly(item.exitTime)} @ {formatTimeTo12Hour(item.exitTime)}</Text>
+          Dispatched from Quarry: <Text style={styles.footerValue}>{formatDateOnly(item.exitTime)} {formatTimeTo12Hour(item.exitTime)}</Text>
         </Text>
       </View>
 
@@ -222,7 +219,7 @@ export const IncomingFleetScreen: React.FC = () => {
     <View style={[styles.card, styles.historyCard]}>
       <View style={styles.cardHeader}>
         <View style={styles.vehicleRow}>
-          <CheckCircle2 size={16} color="#4B5563" />
+          <CheckCircle2 size={16} color="#10B981" />
           <Text style={styles.historyVehicleNo}>{item.vehicleNumber}</Text>
         </View>
         <View style={styles.historyStatusBadge}>
@@ -232,21 +229,30 @@ export const IncomingFleetScreen: React.FC = () => {
 
       <View style={styles.historyDetails}>
         <Text style={styles.historyText}>
-          Trip ID: <Text style={{ fontWeight: 'bold' }}>{item.id}</Text> | {item.material} ({item.netWeight}T)
+          Trip ID: <Text style={{ fontWeight: 'bold', color: '#F8FAFC' }}>{item.id}</Text> | {item.material} ({item.netWeight}T)
         </Text>
         <Text style={styles.historyText}>
-          Unloaded at: <Text style={{ fontWeight: '600' }}>{item.unloadingLocation}</Text>
+          Unloaded at: <Text style={{ fontWeight: '600', color: '#F8FAFC' }}>{item.unloadingLocation}</Text>
         </Text>
         <Text style={styles.historyText}>
-          Close Time: <Text style={{ fontWeight: '600' }}>{item.unloadDate} @ {item.unloadExitTime}</Text>
+          Close Time: <Text style={{ fontWeight: '600', color: '#F8FAFC' }}>{item.unloadDate} {item.unloadExitTime}</Text>
         </Text>
       </View>
+
+      <Button
+        title="View Details"
+        variant="outline"
+        onPress={() => {
+          setDetailLorry(item);
+          setDetailModalVisible(true);
+        }}
+        style={{ marginTop: 10, height: 40 }}
+      />
     </View>
   );
 
   return (
     <View style={styles.container}>
-
       {/* SearchBar Filter */}
       {!loading && (
         ((activeSubTab === 'incoming' && incomingList.length > 0) ||
@@ -262,56 +268,86 @@ export const IncomingFleetScreen: React.FC = () => {
 
       {loading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#6366F1" />
           <Text style={styles.loaderText}>Fetching Transit Cargo...</Text>
         </View>
       ) : activeSubTab === 'incoming' ? (
         incomingList.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Truck size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>No Incoming Cargo</Text>
-            <Text style={styles.emptySubtext}>
-              Vehicles dispatched from the Quarry operator terminal will show up here as IN_TRANSIT.
-            </Text>
-          </View>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+            }
+          >
+            <View style={styles.emptyContainer}>
+              <Truck size={48} color="#9CA3AF" />
+              <Text style={styles.emptyText}>No Incoming Cargo</Text>
+              <Text style={styles.emptySubtext}>
+                Vehicles dispatched from the Quarry operator terminal will show up here as IN_TRANSIT.
+              </Text>
+            </View>
+          </ScrollView>
         ) : filteredIncomingList.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Truck size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>No matching vehicles found</Text>
-            <Text style={styles.emptySubtext}>
-              Try adjusting your search query.
-            </Text>
-          </View>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+            }
+          >
+            <View style={styles.emptyContainer}>
+              <Truck size={48} color="#9CA3AF" />
+              <Text style={styles.emptyText}>No matching vehicles found</Text>
+              <Text style={styles.emptySubtext}>Try adjusting your search query.</Text>
+            </View>
+          </ScrollView>
         ) : (
           <FlatList
             data={filteredIncomingList}
             keyExtractor={(item) => item.id}
             renderItem={renderIncomingCard}
             contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+            }
           />
         )
       ) : historyList.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <History size={48} color="#9CA3AF" />
-          <Text style={styles.emptyText}>No Completed Trips</Text>
-          <Text style={styles.emptySubtext}>
-            Verified offloads will appear in this historical workspace archive.
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+          }
+        >
+          <View style={styles.emptyContainer}>
+            <History size={48} color="#9CA3AF" />
+            <Text style={styles.emptyText}>No Completed Trips</Text>
+            <Text style={styles.emptySubtext}>
+              Verified offloads will appear in this historical archive.
+            </Text>
+          </View>
+        </ScrollView>
       ) : filteredHistoryList.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <History size={48} color="#9CA3AF" />
-          <Text style={styles.emptyText}>No matching vehicles found</Text>
-          <Text style={styles.emptySubtext}>
-            Try adjusting your search query.
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+          }
+        >
+          <View style={styles.emptyContainer}>
+            <History size={48} color="#9CA3AF" />
+            <Text style={styles.emptyText}>No matching vehicles found</Text>
+            <Text style={styles.emptySubtext}>Try adjusting your search query.</Text>
+          </View>
+        </ScrollView>
       ) : (
         <FlatList
           data={filteredHistoryList}
           keyExtractor={(item) => item.id}
           renderItem={renderHistoryCard}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+          }
         />
       )}
 
@@ -329,7 +365,7 @@ export const IncomingFleetScreen: React.FC = () => {
               style={styles.keyboardView}
             >
               <View style={styles.modalHeader}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.modalTitle}>Unloading Verification</Text>
                   <Text style={styles.modalSubtitle}>Trip: {selectedLorry.id} | {selectedLorry.vehicleNumber}</Text>
                 </View>
@@ -338,7 +374,7 @@ export const IncomingFleetScreen: React.FC = () => {
                   onPress={() => setModalVisible(false)}
                   style={styles.closeBtn}
                 >
-                  <X size={24} color="#1F2937" />
+                  <X size={24} color="#F8FAFC" />
                 </TouchableOpacity>
               </View>
 
@@ -359,7 +395,7 @@ export const IncomingFleetScreen: React.FC = () => {
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Quarry Exit Time:</Text>
-                    <Text style={styles.manifestValue}>{formatDateOnly(selectedLorry.exitTime)} @ {formatTimeTo12Hour(selectedLorry.exitTime)}</Text>
+                    <Text style={styles.manifestValue}>{formatDateOnly(selectedLorry.exitTime)} {formatTimeTo12Hour(selectedLorry.exitTime)}</Text>
                   </View>
                 </View>
 
@@ -372,6 +408,7 @@ export const IncomingFleetScreen: React.FC = () => {
                       onChange={setUnloadDate}
                       mode="date"
                       required={true}
+                      labelStyle={{ color: '#94A3B8' }}
                     />
                   </View>
                   <View style={styles.halfCol}>
@@ -381,6 +418,7 @@ export const IncomingFleetScreen: React.FC = () => {
                       onChange={setUnloadEntryTime}
                       mode="time"
                       required={true}
+                      labelStyle={{ color: '#94A3B8' }}
                     />
                   </View>
                 </View>
@@ -399,16 +437,9 @@ export const IncomingFleetScreen: React.FC = () => {
                   }}
                   required={true}
                   error={errors.unloadingLocation}
+                  labelStyle={{ color: '#94A3B8' }}
                 />
-
-                {/* Exit Time */}
-                <DateTimeField
-                  label="Unload Exit Time"
-                  value={unloadExitTime}
-                  onChange={setUnloadExitTime}
-                  mode="time"
-                  required={true}
-                />
+                {errors.unloadingLocation ? <Text style={styles.inlineError}>{errors.unloadingLocation}</Text> : null}
 
                 {/* Hardware input: Take Unloading photo */}
                 <View style={styles.cameraContainer}>
@@ -423,7 +454,7 @@ export const IncomingFleetScreen: React.FC = () => {
 
                 {/* FIXED GEOFENCE SECURITY BANNER */}
                 <View style={styles.geofenceAlertBanner}>
-                  <ShieldCheck size={20} color="#16A34A" />
+                  <ShieldCheck size={20} color="#10B981" />
                   <View style={styles.geofenceTextContainer}>
                     <Text style={styles.geofenceTitle}>📍 GPS Match Verified</Text>
                     <Text style={styles.geofenceSubtext}>Site Geofence Secured (Unload Terminal Validated)</Text>
@@ -432,13 +463,87 @@ export const IncomingFleetScreen: React.FC = () => {
 
                 <Button
                   title="Verify & Close Trip"
+                  loadingTitle="Verifying..."
                   variant="secondary"
                   onPress={handleVerifySubmit}
+                  disabled={submitLoading}
+                  loading={submitLoading}
                   style={styles.submitVerifyBtn}
                 />
               </ScrollView>
             </KeyboardAvoidingView>
           </SafeAreaView>
+        </Modal>
+      )}
+
+      {/* Detail Viewer Modal */}
+      {detailLorry && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={detailModalVisible}
+          onRequestClose={() => setDetailModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '85%' }]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>Trip Offload Details</Text>
+                  <Text style={styles.modalSubtitle}>Trip ID: {detailLorry.id} | {detailLorry.vehicleNumber}</Text>
+                </View>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setDetailModalVisible(false)}
+                  style={styles.closeBtn}
+                >
+                  <X size={20} color="#F1F5F9" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
+                <View style={styles.manifestCard}>
+                  <Text style={styles.manifestTitle}>CARGO DISPATCH MANIFEST</Text>
+                  <View style={styles.manifestRow}>
+                    <Text style={styles.manifestLabel}>Transporter:</Text>
+                    <Text style={styles.manifestValue}>{detailLorry.transporterName}</Text>
+                  </View>
+                  <View style={styles.manifestRow}>
+                    <Text style={styles.manifestLabel}>Material Type:</Text>
+                    <Text style={styles.manifestValue}>{detailLorry.material}</Text>
+                  </View>
+                  <View style={styles.manifestRow}>
+                    <Text style={styles.manifestLabel}>Tyre Configuration:</Text>
+                    <Text style={styles.manifestValue}>{detailLorry.tyres} Wheeler Lorry</Text>
+                  </View>
+                  <View style={styles.manifestRow}>
+                    <Text style={styles.manifestLabel}>Net Weight:</Text>
+                    <Text style={styles.manifestValue}>{detailLorry.netWeight} Tons</Text>
+                  </View>
+                  <View style={styles.manifestRow}>
+                    <Text style={styles.manifestLabel}>Quarry Exit Time:</Text>
+                    <Text style={styles.manifestValue}>{formatDateOnly(detailLorry.exitTime)} {formatTimeTo12Hour(detailLorry.exitTime)}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.summaryBar}>
+                  <Text style={[styles.summaryText, { textAlign: 'left', fontWeight: 'bold', marginBottom: 6, color: '#F8FAFC' }]}>
+                    UNLOADING LOG
+                  </Text>
+                  <Text style={styles.summaryText}>Unloading Location: {detailLorry.unloadingLocation}</Text>
+                  <Text style={styles.summaryText}>Unload Entry Time: {detailLorry.unloadDate} {detailLorry.unloadEntryTime}</Text>
+                  <Text style={styles.summaryText}>Unload Exit Time: {detailLorry.unloadDate} {detailLorry.unloadExitTime}</Text>
+                </View>
+
+                {detailLorry.unloadPhoto && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={[styles.detailLabel, { marginBottom: 6 }]}>Security Offload Verification Photo</Text>
+                    <View style={styles.detailPhotoContainer}>
+                      <Image source={{ uri: detailLorry.unloadPhoto }} style={styles.detailPhoto} />
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
         </Modal>
       )}
 
@@ -452,7 +557,7 @@ export const IncomingFleetScreen: React.FC = () => {
           }}
           style={[styles.tabItem, activeSubTab === 'incoming' ? styles.tabItemActive : null]}
         >
-          <Route size={20} color={activeSubTab === 'incoming' ? '#16A34A' : '#6B7280'} />
+          <Route size={20} color={activeSubTab === 'incoming' ? '#818CF8' : '#6B7280'} />
           <Text style={[styles.tabText, activeSubTab === 'incoming' ? styles.tabTextActive : null]}>
             Incoming Fleet ({incomingList.length})
           </Text>
@@ -466,7 +571,7 @@ export const IncomingFleetScreen: React.FC = () => {
           }}
           style={[styles.tabItem, activeSubTab === 'history' ? styles.tabItemActive : null]}
         >
-          <History size={20} color={activeSubTab === 'history' ? '#16A34A' : '#6B7280'} />
+          <History size={20} color={activeSubTab === 'history' ? '#818CF8' : '#6B7280'} />
           <Text style={[styles.tabText, activeSubTab === 'history' ? styles.tabTextActive : null]}>
             Unload Archive ({historyList.length})
           </Text>
@@ -479,7 +584,7 @@ export const IncomingFleetScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#0F172A',
   },
   loaderContainer: {
     flex: 1,
@@ -489,14 +594,14 @@ const styles = StyleSheet.create({
   loaderText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#4B5563',
+    color: '#94A3B8',
     fontWeight: '500',
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    backgroundColor: '#1E293B',
+    borderTopWidth: 1.5,
+    borderTopColor: '#334155',
     paddingBottom: Platform.OS === 'ios' ? 24 : 10,
     paddingTop: 10,
   },
@@ -513,25 +618,24 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tabTextActive: {
-    color: '#16A34A',
+    color: '#818CF8',
   },
   listContent: {
     padding: 16,
     paddingBottom: 32,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    backgroundColor: '#1E293B',
+    borderWidth: 1.5,
+    borderColor: '#334155',
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
   },
   historyCard: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#F9FAFB',
-    opacity: 0.85,
+    borderColor: '#334155',
+    backgroundColor: '#1E293B',
+    opacity: 0.9,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -546,17 +650,17 @@ const styles = StyleSheet.create({
   vehicleNo: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#F8FAFC',
     marginLeft: 6,
   },
   historyVehicleNo: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: '#F8FAFC',
     marginLeft: 6,
   },
   tripIdBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -564,10 +668,10 @@ const styles = StyleSheet.create({
   tripIdText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#1D4ED8',
+    color: '#818CF8',
   },
   historyStatusBadge: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -575,41 +679,41 @@ const styles = StyleSheet.create({
   historyStatusText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: '#34D399',
   },
   cardBody: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#0F172A',
     padding: 10,
     borderRadius: 6,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#334155',
   },
   col: {
     flex: 1,
   },
   detailLabel: {
     fontSize: 11,
-    color: '#6B7280',
+    color: '#94A3B8',
     marginBottom: 2,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#F8FAFC',
   },
   cardFooterInfo: {
     marginBottom: 16,
   },
   footerLabel: {
     fontSize: 12,
-    color: '#4B5563',
+    color: '#94A3B8',
     marginBottom: 3,
   },
   footerValue: {
-    color: '#1F2937',
+    color: '#F8FAFC',
     fontWeight: '600',
   },
   cardArriveBtn: {
@@ -618,12 +722,12 @@ const styles = StyleSheet.create({
   },
   historyDetails: {
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#334155',
     paddingTop: 8,
   },
   historyText: {
     fontSize: 12,
-    color: '#4B5563',
+    color: '#94A3B8',
     marginBottom: 3,
   },
   // Empty states
@@ -636,12 +740,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: '#94A3B8',
     marginTop: 12,
   },
   emptySubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#64748B',
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 18,
@@ -649,7 +753,7 @@ const styles = StyleSheet.create({
   // Modal layout
   safeContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
   },
   keyboardView: {
     flex: 1,
@@ -660,18 +764,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#334155',
+    backgroundColor: '#0F172A',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#F8FAFC',
   },
   modalSubtitle: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#94A3B8',
     marginTop: 2,
   },
   closeBtn: {
@@ -682,8 +786,8 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   manifestCard: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    borderColor: '#6366F1',
     borderWidth: 1.5,
     borderRadius: 8,
     padding: 14,
@@ -692,7 +796,7 @@ const styles = StyleSheet.create({
   manifestTitle: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#1E40AF',
+    color: '#818CF8',
     marginBottom: 8,
     letterSpacing: 0.5,
   },
@@ -703,12 +807,12 @@ const styles = StyleSheet.create({
   },
   manifestLabel: {
     fontSize: 13,
-    color: '#4B5563',
+    color: '#94A3B8',
   },
   manifestValue: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#F8FAFC',
   },
   dateTimeRow: {
     flexDirection: 'row',
@@ -721,19 +825,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   camError: {
-    color: '#DC2626',
+    color: '#EF4444',
     fontSize: 12,
     textAlign: 'center',
     marginTop: -8,
     marginBottom: 12,
     fontWeight: 'bold',
   },
-  // Geofence alert banner style
   geofenceAlertBanner: {
     flexDirection: 'row',
-    backgroundColor: '#DCFCE7',
-    borderColor: '#86EFAC',
-    borderWidth: 2,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: '#10B981',
+    borderWidth: 1.5,
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
@@ -746,15 +849,69 @@ const styles = StyleSheet.create({
   geofenceTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#14532D',
+    color: '#34D399',
   },
   geofenceSubtext: {
     fontSize: 11,
-    color: '#166534',
+    color: '#059669',
     marginTop: 1,
   },
   submitVerifyBtn: {
     height: 54, // Large high-contrast touch target
     marginTop: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  inlineError: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 12,
+    fontWeight: 'bold',
+  },
+  summaryBar: {
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  summaryText: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  detailPhotoContainer: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    backgroundColor: '#0F172A',
+    overflow: 'hidden',
+  },
+  detailPhoto: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
 });

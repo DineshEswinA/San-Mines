@@ -112,6 +112,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   outlineText: {
     fontSize: 16,
@@ -119,6 +120,7 @@ const styles = StyleSheet.create({
     color: '#1E40AF',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   disabledText: {
     // Opacity on container handles visual dimming

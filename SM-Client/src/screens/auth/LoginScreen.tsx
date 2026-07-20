@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { Button } from '../../components/ui/Button';
 import {
   Mail,
   Lock,
@@ -214,21 +215,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
             </TouchableOpacity>
 
             {/* Enter Dashboard Button */}
-            <TouchableOpacity
-              activeOpacity={0.8}
+            <Button
+              title="Enter Dashboard"
+              loadingTitle="Signing in..."
+              variant="primary"
               onPress={handleLogin}
               disabled={loading}
-              style={[styles.submitBtn, loading ? { opacity: 0.8 } : null]}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <Text style={styles.submitBtnText}>Enter Dashboard</Text>
-                  <ArrowRight size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
-                </>
-              )}
-            </TouchableOpacity>
+              loading={loading}
+              style={styles.submitBtn}
+            />
 
             {/* Sign up toggle link */}
             <View style={styles.signupToggleRow}>
@@ -266,7 +261,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#F8FAFC', // Slate background
+    backgroundColor: '#0F172A',
   },
   keyboardView: {
     flex: 1,
@@ -291,17 +286,17 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#3B2FD9', // LogiTrack Pro blue
+    color: '#818CF8',
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#F8FAFC',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#475569',
+    color: '#94A3B8',
     lineHeight: 20,
   },
   oauthContainer: {
@@ -309,20 +304,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   oauthBtn: {
-    height: 52, // >= 48px target
+    height: 52,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: '#334155',
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E293B',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: 1,
   },
   fakeGoogleLogo: {
     width: 20,
@@ -342,7 +332,7 @@ const styles = StyleSheet.create({
   oauthBtnText: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#F8FAFC',
   },
   dividerRow: {
     flexDirection: 'row',
@@ -353,12 +343,12 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#334155',
   },
   dividerText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#94A3B8',
     marginHorizontal: 16,
     letterSpacing: 1.5,
   },
@@ -371,7 +361,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#475569',
+    color: '#94A3B8',
     marginBottom: 8,
     letterSpacing: 0.8,
   },
@@ -384,14 +374,14 @@ const styles = StyleSheet.create({
   forgotPasswordLink: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#3B2FD9',
+    color: '#818CF8',
   },
   inputWrapper: {
-    height: 52, // >= 48px
+    height: 52,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: '#334155',
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -406,7 +396,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     fontSize: 16,
-    color: '#0F172A',
+    color: '#F8FAFC',
   },
   eyeBtn: {
     padding: 8,
@@ -427,16 +417,16 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderWidth: 1.5,
-    borderColor: '#94A3B8',
+    borderColor: '#334155',
     borderRadius: 4,
     marginRight: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
   },
   checkboxChecked: {
-    borderColor: '#3B2FD9',
-    backgroundColor: '#3B2FD9',
+    borderColor: '#6366F1',
+    backgroundColor: '#6366F1',
   },
   checkboxInner: {
     width: 8,
@@ -446,19 +436,15 @@ const styles = StyleSheet.create({
   },
   checkboxLabel: {
     fontSize: 14,
-    color: '#475569',
+    color: '#94A3B8',
   },
   submitBtn: {
-    height: 54, // Large high-contrast touch target
-    backgroundColor: '#3B2FD9',
+    height: 54,
+    backgroundColor: '#6366F1',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
-    shadowColor: '#3B2FD9',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
     elevation: 3,
   },
   submitBtnText: {
@@ -477,18 +463,18 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#94A3B8',
   },
   toggleLink: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#3B2FD9',
+    color: '#818CF8',
   },
   encryptedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderColor: '#DBEAFE',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: '#10B981',
     borderWidth: 1.5,
     borderRadius: 8,
     padding: 16,
@@ -497,13 +483,13 @@ const styles = StyleSheet.create({
   encryptedTitle: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#16A34A',
+    color: '#34D399',
     marginBottom: 4,
     letterSpacing: 0.5,
   },
   encryptedSubtext: {
     fontSize: 11,
-    color: '#374151',
+    color: '#94A3B8',
     lineHeight: 15,
   },
   footer: {

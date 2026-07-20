@@ -110,7 +110,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <ClipboardList size={28} color="#1E40AF" />
+            <ClipboardList size={28} color="#818CF8" />
             <Text style={styles.cardTitle}>Lorry Check-In Registration</Text>
           </View>
           <Text style={styles.cardSubtitle}>
@@ -127,6 +127,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
               required={true}
               autoCapitalize="words"
               editable={!loading}
+              labelStyle={{ color: '#94A3B8' }}
             />
 
             <Input
@@ -139,6 +140,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
               autoCapitalize="characters"
               isAlphanumeric={true}
               editable={!loading}
+              labelStyle={{ color: '#94A3B8' }}
             />
 
             <View style={styles.dateTimeRow}>
@@ -150,6 +152,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
                   mode="date"
                   required={true}
                   disabled={loading}
+                  labelStyle={{ color: '#94A3B8' }}
                 />
               </View>
               <View style={styles.halfWidth}>
@@ -160,6 +163,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
                   mode="time"
                   required={true}
                   disabled={loading}
+                  labelStyle={{ color: '#94A3B8' }}
                 />
               </View>
             </View>
@@ -190,20 +194,21 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
 const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
+    backgroundColor: '#0F172A',
   },
   scrollContainer: {
     padding: 16,
     paddingBottom: 32,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E293B',
     borderRadius: 12,
     padding: 20,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderWidth: 1.5,
+    borderColor: '#334155',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -215,12 +220,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#F8FAFC',
     marginLeft: 8,
   },
   cardSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
+    color: '#94A3B8',
     marginBottom: 20,
     lineHeight: 18,
   },
@@ -241,8 +246,8 @@ const styles = StyleSheet.create({
   },
   warningContainer: {
     marginTop: 16,
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FCD34D',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: '#D97706',
     borderWidth: 1.5,
     borderRadius: 8,
     padding: 12,
@@ -250,12 +255,12 @@ const styles = StyleSheet.create({
   warningTitle: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#92400E',
+    color: '#FBBF24',
     marginBottom: 4,
   },
   warningText: {
     fontSize: 11,
-    color: '#B45309',
+    color: '#F59E0B',
     lineHeight: 15,
   },
 });

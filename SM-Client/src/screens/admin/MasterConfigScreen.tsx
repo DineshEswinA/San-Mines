@@ -10,15 +10,31 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { Input, PickerField } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { MapPin, Plus, Layers, Disc, Trash2, CheckCircle2, ChevronRight, X } from 'lucide-react-native';
+import { MapPin, Plus, Layers, Disc, Trash2, Edit2, X } from 'lucide-react-native';
 
 export const MasterConfigScreen: React.FC = () => {
-  const { locations, materials, wheelTypes, fetchConfigData } = useAuth();
+  const {
+    locations,
+    materials,
+    wheelTypes,
+    fetchConfigData,
+    addLocationState,
+    updateLocationState,
+    removeLocationState,
+    addMaterialState,
+    updateMaterialState,
+    removeMaterialState,
+    addWheelTypeState,
+    updateWheelTypeState,
+    removeWheelTypeState,
+  } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'LOCATIONS' | 'MATERIALS' | 'WHEELS'>('LOCATIONS');
   const [loading, setLoading] = useState(false);
 
@@ -45,7 +61,7 @@ export const MasterConfigScreen: React.FC = () => {
     scrollViewRef.current?.scrollTo({ x: pageIndex * screenWidth, animated: true });
   };
 
-  // Locations State
+  // Add Location State
   const [locModalVisible, setLocModalVisible] = useState(false);
   const [locName, setLocName] = useState('');
   const [locLat, setLocLat] = useState('');
@@ -53,8 +69,31 @@ export const MasterConfigScreen: React.FC = () => {
   const [locNodeType, setLocNodeType] = useState<'QUARRY' | 'UNLOAD_SITE'>('QUARRY');
   const [locRadius, setLocRadius] = useState<number>(100);
 
-  const [localWheelTypes, setLocalWheelTypes] = useState<any[]>([]);
+  // Edit Location State
+  const [editLocModalVisible, setEditLocModalVisible] = useState(false);
+  const [selectedLocId, setSelectedLocId] = useState<number | null>(null);
+  const [editLocName, setEditLocName] = useState('');
+  const [editLocLat, setEditLocLat] = useState('');
+  const [editLocLng, setEditLocLng] = useState('');
+  const [editLocNodeType, setEditLocNodeType] = useState<'QUARRY' | 'UNLOAD_SITE'>('QUARRY');
+  const [editLocRadius, setEditLocRadius] = useState<number>(100);
+
+  // Material State
   const [newMaterialName, setNewMaterialName] = useState('');
+  // Edit Material State
+  const [editMatModalVisible, setEditMatModalVisible] = useState(false);
+  const [selectedMatId, setSelectedMatId] = useState<number | null>(null);
+  const [editMatDisplayName, setEditMatDisplayName] = useState('');
+
+  // Wheel State
+  const [localWheelTypes, setLocalWheelTypes] = useState<any[]>([]);
+  const [newWheelCount, setNewWheelCount] = useState('');
+  const [newWheelLabel, setNewWheelLabel] = useState('');
+  // Edit Wheel State
+  const [editWheelModalVisible, setEditWheelModalVisible] = useState(false);
+  const [selectedWheelId, setSelectedWheelId] = useState<number | null>(null);
+  const [editWheelCount, setEditWheelCount] = useState('');
+  const [editWheelLabel, setEditWheelLabel] = useState('');
 
   useEffect(() => {
     fetchConfigData();
@@ -91,20 +130,104 @@ export const MasterConfigScreen: React.FC = () => {
 
       if (res.error) throw new Error(res.error);
 
+      if (res.data && res.data.location) {
+        addLocationState(res.data.location);
+      }
+
       Alert.alert('Success', `Location "${locName}" created successfully.`);
       setLocModalVisible(false);
-      // Reset form
       setLocName('');
       setLocLat('');
       setLocLng('');
       setLocNodeType('QUARRY');
       setLocRadius(100);
-      await fetchConfigData();
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to add location node.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handler: Edit Location
+  const handleEditLocationOpen = (loc: any) => {
+    setSelectedLocId(loc.id);
+    setEditLocName(loc.name);
+    setEditLocLat(String(loc.latitude));
+    setEditLocLng(String(loc.longitude));
+    setEditLocNodeType(loc.node_type);
+    setEditLocRadius(loc.allowed_radius_meters || 100);
+    setEditLocModalVisible(true);
+  };
+
+  const handleEditLocationSubmit = async () => {
+    if (!selectedLocId) return;
+    if (!editLocName.trim() || !editLocLat.trim() || !editLocLng.trim()) {
+      Alert.alert('Validation Error', 'All location coordinates and name are required.');
+      return;
+    }
+
+    const latVal = parseFloat(editLocLat);
+    const lngVal = parseFloat(editLocLng);
+
+    if (isNaN(latVal) || isNaN(lngVal)) {
+      Alert.alert('Validation Error', 'Latitude and Longitude must be valid numbers.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.updateLocation(selectedLocId, {
+        name: editLocName.trim(),
+        node_type: editLocNodeType,
+        latitude: latVal,
+        longitude: lngVal,
+        allowed_radius_meters: editLocRadius,
+      });
+
+      if (res.error) throw new Error(res.error);
+
+      if (res.data && res.data.location) {
+        updateLocationState(selectedLocId, res.data.location);
+      }
+
+      Alert.alert('Success', `Location "${editLocName}" updated successfully.`);
+      setEditLocModalVisible(false);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update location node.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler: Delete Location
+  const handleDeleteLocation = (loc: any) => {
+    Alert.alert(
+      'Confirm Delete',
+      `Are you sure you want to permanently delete location "${loc.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const res = await api.deleteLocation(loc.id);
+              if (res.error) {
+                Alert.alert('Deletion Blocked', res.error);
+                return;
+              }
+              removeLocationState(loc.id);
+              Alert.alert('Deleted', 'Location node has been removed successfully.');
+            } catch (err: any) {
+              Alert.alert('Deletion Blocked', err.message || 'Could not delete location because it is mapped to trips.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Handler: Add Material
@@ -128,9 +251,12 @@ export const MasterConfigScreen: React.FC = () => {
 
       if (res.error) throw new Error(res.error);
 
+      if (res.data && res.data.material) {
+        addMaterialState(res.data.material);
+      }
+
       Alert.alert('Success', `Material "${newMaterialName}" appended successfully.`);
       setNewMaterialName('');
-      await fetchConfigData();
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to add material type.');
     } finally {
@@ -138,23 +264,89 @@ export const MasterConfigScreen: React.FC = () => {
     }
   };
 
+  // Handler: Edit Material
+  const handleEditMaterialOpen = (mat: any) => {
+    setSelectedMatId(mat.id);
+    setEditMatDisplayName(mat.display_name);
+    setEditMatModalVisible(true);
+  };
+
+  const handleEditMaterialSubmit = async () => {
+    if (!selectedMatId) return;
+    if (!editMatDisplayName.trim()) {
+      Alert.alert('Validation Error', 'Material name display string is required.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const internalName = editMatDisplayName
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_');
+
+      const res = await api.updateMaterial(selectedMatId, {
+        material_name: internalName,
+        display_name: editMatDisplayName.trim(),
+      });
+
+      if (res.error) throw new Error(res.error);
+
+      if (res.data && res.data.material) {
+        updateMaterialState(selectedMatId, res.data.material);
+      }
+
+      Alert.alert('Success', `Material updated to "${editMatDisplayName}".`);
+      setEditMatModalVisible(false);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update material.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler: Delete Material
+  const handleDeleteMaterial = (mat: any) => {
+    Alert.alert(
+      'Confirm Delete',
+      `Are you sure you want to permanently delete material "${mat.display_name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const res = await api.deleteMaterial(mat.id);
+              if (res.error) {
+                Alert.alert('Deletion Blocked', res.error);
+                return;
+              }
+              removeMaterialState(mat.id);
+              Alert.alert('Deleted', 'Material chip has been removed successfully.');
+            } catch (err: any) {
+              Alert.alert('Deletion Blocked', err.message || 'Could not delete material because it is mapped to trips.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Handler: Toggle Wheel Type Status (Optimistic Update)
   const handleToggleWheelType = async (id: number, currentStatus: boolean) => {
-    // 1. Instantly flip the switch state locally
     setLocalWheelTypes((prev) =>
       prev.map((w) => (w.id === id ? { ...w, is_active: !currentStatus } : w))
     );
 
     try {
-      // 2. Perform the server update in the background
       const res = await api.updateWheelType(id, !currentStatus);
-
       if (res.error) throw new Error(res.error);
-
-      // 3. Sync backend configuration state to keep other screens updated
-      await fetchConfigData();
+      await fetchConfigData(true);
     } catch (err: any) {
-      // 4. Revert the switch state if the API fails
       setLocalWheelTypes((prev) =>
         prev.map((w) => (w.id === id ? { ...w, is_active: currentStatus } : w))
       );
@@ -162,257 +354,650 @@ export const MasterConfigScreen: React.FC = () => {
     }
   };
 
+  // Handler: Add Wheel Type
+  const handleAddWheelType = async () => {
+    if (!newWheelCount.trim() || !newWheelLabel.trim()) {
+      Alert.alert('Validation Error', 'Both wheel count and label are required.');
+      return;
+    }
+
+    const countVal = parseInt(newWheelCount, 10);
+    if (isNaN(countVal) || countVal <= 0) {
+      Alert.alert('Validation Error', 'Wheel count must be a positive integer.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.createWheelType({
+        wheel_count: countVal,
+        display_label: newWheelLabel.trim(),
+      });
+
+      if (res.error) throw new Error(res.error);
+
+      if (res.data && res.data.wheel_type) {
+        addWheelTypeState(res.data.wheel_type);
+      }
+
+      Alert.alert('Success', `Lorry Class "${newWheelLabel}" appended successfully.`);
+      setNewWheelCount('');
+      setNewWheelLabel('');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to add lorry configuration.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler: Edit Wheel Type
+  const handleEditWheelOpen = (wheel: any) => {
+    setSelectedWheelId(wheel.id);
+    setEditWheelCount(String(wheel.wheel_count));
+    setEditWheelLabel(wheel.display_label);
+    setEditWheelModalVisible(true);
+  };
+
+  const handleEditWheelSubmit = async () => {
+    if (!selectedWheelId) return;
+    if (!editWheelCount.trim() || !editWheelLabel.trim()) {
+      Alert.alert('Validation Error', 'Both wheel count and label are required.');
+      return;
+    }
+
+    const countVal = parseInt(editWheelCount, 10);
+    if (isNaN(countVal) || countVal <= 0) {
+      Alert.alert('Validation Error', 'Wheel count must be a positive integer.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.updateWheelType(selectedWheelId, {
+        wheel_count: countVal,
+        display_label: editWheelLabel.trim(),
+      });
+
+      if (res.error) throw new Error(res.error);
+
+      if (res.data && res.data.wheel_type) {
+        updateWheelTypeState(selectedWheelId, res.data.wheel_type);
+      }
+
+      Alert.alert('Success', `Lorry class updated to "${editWheelLabel}".`);
+      setEditWheelModalVisible(false);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update lorry configuration.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handler: Delete Wheel Type
+  const handleDeleteWheel = (wheel: any) => {
+    Alert.alert(
+      'Confirm Delete',
+      `Are you sure you want to permanently delete configuration "${wheel.wheel_count} Wheeler Lorry"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const res = await api.deleteWheelType(wheel.id);
+              if (res.error) {
+                Alert.alert('Deletion Blocked', res.error);
+                return;
+              }
+              removeWheelTypeState(wheel.id);
+              Alert.alert('Deleted', 'Lorry configuration has been removed successfully.');
+            } catch (err: any) {
+              Alert.alert('Deletion Blocked', err.message || 'Could not delete configuration because it is mapped to trips.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Sub-tab Navigation */}
-      <View style={styles.subTabContainer}>
-        <TouchableOpacity
-          style={[styles.subTab, activeSubTab === 'LOCATIONS' && styles.subTabActive]}
-          onPress={() => handleTabPress('LOCATIONS')}
-        >
-          <MapPin size={16} color={activeSubTab === 'LOCATIONS' ? '#6366F1' : '#94A3B8'} style={{ marginRight: 6 }} />
-          <Text style={[styles.subTabText, activeSubTab === 'LOCATIONS' && styles.subTabTextActive]}>
-            Locations
-          </Text>
-        </TouchableOpacity>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1 }}
+    >
+      <View style={styles.container}>
+        {/* Sub-tab Navigation */}
+        <View style={styles.subTabContainer}>
+          <TouchableOpacity
+            style={[styles.subTab, activeSubTab === 'LOCATIONS' && styles.subTabActive]}
+            onPress={() => handleTabPress('LOCATIONS')}
+          >
+            <MapPin size={16} color={activeSubTab === 'LOCATIONS' ? '#6366F1' : '#94A3B8'} style={{ marginRight: 6 }} />
+            <Text style={[styles.subTabText, activeSubTab === 'LOCATIONS' && styles.subTabTextActive]}>
+              Locations
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.subTab, activeSubTab === 'MATERIALS' && styles.subTabActive]}
-          onPress={() => handleTabPress('MATERIALS')}
-        >
-          <Layers size={16} color={activeSubTab === 'MATERIALS' ? '#6366F1' : '#94A3B8'} style={{ marginRight: 6 }} />
-          <Text style={[styles.subTabText, activeSubTab === 'MATERIALS' && styles.subTabTextActive]}>
-            Materials
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.subTab, activeSubTab === 'MATERIALS' && styles.subTabActive]}
+            onPress={() => handleTabPress('MATERIALS')}
+          >
+            <Layers size={16} color={activeSubTab === 'MATERIALS' ? '#6366F1' : '#94A3B8'} style={{ marginRight: 6 }} />
+            <Text style={[styles.subTabText, activeSubTab === 'MATERIALS' && styles.subTabTextActive]}>
+              Materials
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.subTab, activeSubTab === 'WHEELS' && styles.subTabActive]}
-          onPress={() => handleTabPress('WHEELS')}
-        >
-          <Disc size={16} color={activeSubTab === 'WHEELS' ? '#6366F1' : '#94A3B8'} style={{ marginRight: 6 }} />
-          <Text style={[styles.subTabText, activeSubTab === 'WHEELS' && styles.subTabTextActive]}>
-            Wheels
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Main Configurations Section (Swipable Pager) */}
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal={true}
-        pagingEnabled={true}
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScrollEnd}
-        style={{ flex: 1 }}
-      >
-        {/* PANEL 1: LOCATIONS */}
-        <View style={{ width: screenWidth }}>
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Active Yards Registry</Text>
-              <Text style={styles.sectionSubtitle}>Locations where GPS checks are run</Text>
-            </View>
-
-            {locations.map((loc) => (
-              <View key={loc.id} style={styles.listItem}>
-                <View style={styles.itemLeft}>
-                  <View style={[styles.nodeDot, loc.node_type === 'QUARRY' ? styles.nodeQuarry : styles.nodeUnload]} />
-                  <View>
-                    <Text style={styles.itemTitle}>{loc.name}</Text>
-                    <Text style={styles.itemDetail}>
-                      GPS: {Number(loc.latitude).toFixed(4)}, {Number(loc.longitude).toFixed(4)}
-                    </Text>
-                    <Text style={styles.itemRadius}>Allowed Radius: {loc.allowed_radius_meters || 100}m</Text>
-                  </View>
-                </View>
-                <View style={styles.itemRight}>
-                  <Text style={[styles.nodeTypeBadge, loc.node_type === 'QUARRY' ? styles.badgeQuarry : styles.badgeUnload]}>
-                    {loc.node_type}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
+          <TouchableOpacity
+            style={[styles.subTab, activeSubTab === 'WHEELS' && styles.subTabActive]}
+            onPress={() => handleTabPress('WHEELS')}
+          >
+            <Disc size={16} color={activeSubTab === 'WHEELS' ? '#6366F1' : '#94A3B8'} style={{ marginRight: 6 }} />
+            <Text style={[styles.subTabText, activeSubTab === 'WHEELS' && styles.subTabTextActive]}>
+              Wheels
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* PANEL 2: MATERIALS */}
-        <View style={{ width: screenWidth }}>
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Ecosystem Materials Registry</Text>
-              <Text style={styles.sectionSubtitle}>Material chips loaded on outbound lorries</Text>
-            </View>
+        {/* Main Configurations Section (Swipable Pager) */}
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handleScrollEnd}
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* PANEL 1: LOCATIONS */}
+          <View style={{ width: screenWidth }}>
+            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Active Yards Registry</Text>
+                <Text style={styles.sectionSubtitle}>Locations where GPS checks are run</Text>
+              </View>
 
-            {/* Chip Grid */}
-            <View style={styles.chipGrid}>
-              {materials.map((mat) => (
-                <View key={mat.id} style={styles.chip}>
-                  <Layers size={14} color="#818CF8" style={{ marginRight: 6 }} />
-                  <Text style={styles.chipText}>{mat.display_name}</Text>
+              {locations.map((loc) => (
+                <View key={loc.id} style={styles.listItem}>
+                  <View style={styles.itemLeft}>
+                    <View style={[styles.nodeDot, loc.node_type === 'QUARRY' ? styles.nodeQuarry : styles.nodeUnload]} />
+                    <View>
+                      <Text style={styles.itemTitle}>{loc.name}</Text>
+                      <Text style={styles.itemDetail}>
+                        GPS: {Number(loc.latitude).toFixed(4)}, {Number(loc.longitude).toFixed(4)}
+                      </Text>
+                      <Text style={styles.itemRadius}>Allowed Radius: {loc.allowed_radius_meters || 100}m</Text>
+                    </View>
+                  </View>
+                  <View style={styles.itemRight}>
+                    <Text style={[styles.nodeTypeBadge, loc.node_type === 'QUARRY' ? styles.badgeQuarry : styles.badgeUnload, { marginBottom: 8 }]}>
+                      {loc.node_type === 'QUARRY' ? 'Quarry' : 'Unload Site'}
+                    </Text>
+                    <View style={styles.iconActionRow}>
+                      <TouchableOpacity activeOpacity={0.7} style={styles.iconBtn} onPress={() => handleEditLocationOpen(loc)}>
+                        <Edit2 size={16} color="#94A3B8" />
+                      </TouchableOpacity>
+                      <TouchableOpacity activeOpacity={0.7} style={styles.iconBtn} onPress={() => handleDeleteLocation(loc)}>
+                        <Trash2 size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
               ))}
-            </View>
-
-            {/* Add New Material Form */}
-            <View style={styles.formCard}>
-              <Text style={styles.cardFormTitle}>Append New Material Type</Text>
-              <Input
-                label="Material Display Name"
-                placeholder="e.g. Granite Chips (40mm)"
-                value={newMaterialName}
-                onChangeText={setNewMaterialName}
-                required={true}
-              />
-              <Button
-                title="Append to Registry"
-                loading={loading}
-                variant="primary"
-                onPress={handleAddMaterial}
-                style={styles.appendBtn}
-              />
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* PANEL 3: WHEELS */}
-        <View style={{ width: screenWidth }}>
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Vehicle Classes Registry</Text>
-              <Text style={styles.sectionSubtitle}>Instantly activate or deactivate wheel count configurations</Text>
-            </View>
-
-            {localWheelTypes.map((wheel) => (
-              <View key={wheel.id} style={styles.listItem}>
-                <View style={styles.itemLeft}>
-                  <Disc size={20} color="#818CF8" style={{ marginRight: 12 }} />
-                  <View>
-                    <Text style={styles.itemTitle}>{wheel.wheel_count} Wheeler Lorry</Text>
-                    <Text style={styles.itemDetail}>System Identifier: {wheel.display_label}</Text>
-                  </View>
-                </View>
-                <View style={styles.itemRight}>
-                  <Switch
-                    trackColor={{ false: '#475569', true: '#6366F1' }}
-                    thumbColor={wheel.is_active ? '#F8FAFC' : '#94A3B8'}
-                    ios_backgroundColor="#334155"
-                    onValueChange={() => handleToggleWheelType(wheel.id, wheel.is_active)}
-                    value={wheel.is_active}
-                    disabled={false}
-                  />
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      </ScrollView>
-
-      {/* Floating Action Button */}
-      {activeSubTab === 'LOCATIONS' && (
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => setLocModalVisible(true)}
-          style={styles.fab}
-        >
-          <Plus size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      )}
-
-      {/* Modal: Add New Location Node */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={locModalVisible}
-        onRequestClose={() => setLocModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Location Node</Text>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setLocModalVisible(false)}
-                style={styles.closeBtn}
-              >
-                <X size={20} color="#F1F5F9" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.modalBody}>
-              <Input
-                label="Yard / Station Name"
-                placeholder="e.g. Quarry Hub Gamma"
-                value={locName}
-                onChangeText={setLocName}
-                required={true}
-              />
-
-              <View style={styles.row}>
-                <View style={styles.halfWidth}>
-                  <Input
-                    label="Latitude"
-                    placeholder="e.g. 13.0475"
-                    value={locLat}
-                    onChangeText={setLocLat}
-                    keyboardType="numeric"
-                    required={true}
-                  />
-                </View>
-                <View style={styles.halfWidth}>
-                  <Input
-                    label="Longitude"
-                    placeholder="e.g. 80.2089"
-                    value={locLng}
-                    onChangeText={setLocLng}
-                    keyboardType="numeric"
-                    required={true}
-                  />
-                </View>
-              </View>
-
-              <PickerField
-                label="Node Designation Type"
-                options={['QUARRY', 'UNLOAD_SITE']}
-                selectedValue={locNodeType}
-                onValueChange={(val) => setLocNodeType(val as any)}
-                required={true}
-              />
-
-              {/* Custom Rugged Stepper Slider (50m - 500m) */}
-              <View style={styles.sliderGroup}>
-                <Text style={styles.sliderLabel}>Allowed Geofence Radius: {locRadius}m</Text>
-                <View style={styles.sliderBar}>
-                  {[50, 100, 150, 200, 300, 400, 500].map((step) => {
-                    const isSelected = locRadius === step;
-                    return (
-                      <TouchableOpacity
-                        key={step}
-                        activeOpacity={0.8}
-                        style={[styles.sliderStep, isSelected && styles.sliderStepActive]}
-                        onPress={() => setLocRadius(step)}
-                      >
-                        <Text style={[styles.sliderStepText, isSelected && styles.sliderStepTextActive]}>
-                          {step}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              <Button
-                title="Create Location Node"
-                loading={loading}
-                variant="primary"
-                onPress={handleAddLocation}
-                style={styles.submitBtn}
-              />
             </ScrollView>
           </View>
-        </View>
-      </Modal>
-    </View>
+
+          {/* PANEL 2: MATERIALS */}
+          <View style={{ width: screenWidth }}>
+            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Ecosystem Materials Registry</Text>
+                <Text style={styles.sectionSubtitle}>Material chips loaded on outbound lorries</Text>
+              </View>
+
+              {/* Structured Material List Cards */}
+              <View style={{ gap: 10, marginBottom: 24 }}>
+                {materials.map((mat) => (
+                  <View key={mat.id} style={styles.listItem}>
+                    <View style={styles.itemLeft}>
+                      <Layers size={20} color="#818CF8" style={{ marginRight: 12 }} />
+                      <View>
+                        <Text style={styles.itemTitle}>{mat.display_name}</Text>
+                        <Text style={styles.itemDetail}>Identifier: {mat.material_name}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.itemRight}>
+                      <View style={styles.iconActionRow}>
+                        <TouchableOpacity activeOpacity={0.7} style={styles.iconBtn} onPress={() => handleEditMaterialOpen(mat)}>
+                          <Edit2 size={16} color="#94A3B8" />
+                        </TouchableOpacity>
+                        <TouchableOpacity activeOpacity={0.7} style={styles.iconBtn} onPress={() => handleDeleteMaterial(mat)}>
+                          <Trash2 size={16} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Add New Material Form */}
+              <View style={styles.formCard}>
+                <Text style={styles.cardFormTitle}>Append New Material Type</Text>
+                <Input
+                  label="Material Display Name"
+                  placeholder="e.g. Granite Chips (40mm)"
+                  value={newMaterialName}
+                  onChangeText={setNewMaterialName}
+                  required={true}
+                  labelStyle={{ color: '#94A3B8' }}
+                />
+                <Button
+                  title="Append to Registry"
+                  loadingTitle="Appending..."
+                  loading={loading}
+                  disabled={loading}
+                  variant="primary"
+                  onPress={handleAddMaterial}
+                  style={styles.appendBtn}
+                />
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* PANEL 3: WHEELS */}
+          <View style={{ width: screenWidth }}>
+            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Vehicle Classes Registry</Text>
+                <Text style={styles.sectionSubtitle}>Activate, deactivate or customize wheel count configurations</Text>
+              </View>
+
+              <View style={{ gap: 10, marginBottom: 24 }}>
+                {localWheelTypes.map((wheel) => (
+                  <View key={wheel.id} style={styles.listItem}>
+                    <View style={styles.itemLeft}>
+                      <Disc size={20} color="#818CF8" style={{ marginRight: 12 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.itemTitle}>{wheel.wheel_count} Wheeler Lorry</Text>
+                        <Text style={styles.itemDetail}>Identifier: {wheel.display_label}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.itemRight}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Switch
+                          trackColor={{ false: '#475569', true: '#6366F1' }}
+                          thumbColor={wheel.is_active ? '#F8FAFC' : '#94A3B8'}
+                          ios_backgroundColor="#334155"
+                          onValueChange={() => handleToggleWheelType(wheel.id, wheel.is_active)}
+                          value={wheel.is_active}
+                        />
+                        <TouchableOpacity activeOpacity={0.7} style={styles.iconBtn} onPress={() => handleEditWheelOpen(wheel)}>
+                          <Edit2 size={16} color="#94A3B8" />
+                        </TouchableOpacity>
+                        <TouchableOpacity activeOpacity={0.7} style={styles.iconBtn} onPress={() => handleDeleteWheel(wheel)}>
+                          <Trash2 size={16} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Add New Wheel Form */}
+              <View style={styles.formCard}>
+                <Text style={styles.cardFormTitle}>Append New Lorry Class</Text>
+                <View style={styles.row}>
+                  <View style={styles.halfWidth}>
+                    <Input
+                      label="Wheel Count"
+                      placeholder="e.g. 10"
+                      value={newWheelCount}
+                      onChangeText={setNewWheelCount}
+                      keyboardType="numeric"
+                      required={true}
+                      labelStyle={{ color: '#94A3B8' }}
+                    />
+                  </View>
+                  <View style={styles.halfWidth}>
+                    <Input
+                      label="Display Label"
+                      placeholder="e.g. 10"
+                      value={newWheelLabel}
+                      onChangeText={setNewWheelLabel}
+                      required={true}
+                      labelStyle={{ color: '#94A3B8' }}
+                    />
+                  </View>
+                </View>
+                <Button
+                  title="Append Lorry Class"
+                  loadingTitle="Appending..."
+                  loading={loading}
+                  disabled={loading}
+                  variant="primary"
+                  onPress={handleAddWheelType}
+                  style={styles.appendBtn}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </ScrollView>
+
+        {/* Floating Action Button for Location creation */}
+        {activeSubTab === 'LOCATIONS' && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => setLocModalVisible(true)}
+            style={styles.fab}
+          >
+            <Plus size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
+
+        {/* Modal: Add New Location Node */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={locModalVisible}
+          onRequestClose={() => setLocModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add New Location Node</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setLocModalVisible(false)}
+                  style={styles.closeBtn}
+                >
+                  <X size={20} color="#F1F5F9" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+                <Input
+                  label="Yard / Station Name"
+                  placeholder="e.g. Quarry Hub Gamma"
+                  value={locName}
+                  onChangeText={setLocName}
+                  required={true}
+                  labelStyle={{ color: '#94A3B8' }}
+                />
+
+                <View style={styles.row}>
+                  <View style={styles.halfWidth}>
+                    <Input
+                      label="Latitude"
+                      placeholder="e.g. 13.0475"
+                      value={locLat}
+                      onChangeText={setLocLat}
+                      keyboardType="numeric"
+                      required={true}
+                      labelStyle={{ color: '#94A3B8' }}
+                    />
+                  </View>
+                  <View style={styles.halfWidth}>
+                    <Input
+                      label="Longitude"
+                      placeholder="e.g. 80.2089"
+                      value={locLng}
+                      onChangeText={setLocLng}
+                      keyboardType="numeric"
+                      required={true}
+                      labelStyle={{ color: '#94A3B8' }}
+                    />
+                  </View>
+                </View>
+
+                <PickerField
+                  label="Node Designation Type"
+                  options={['Quarry', 'Unload Site']}
+                  selectedValue={locNodeType === 'QUARRY' ? 'Quarry' : 'Unload Site'}
+                  onValueChange={(val) => setLocNodeType(val === 'Quarry' ? 'QUARRY' : 'UNLOAD_SITE')}
+                  required={true}
+                  labelStyle={{ color: '#94A3B8' }}
+                />
+
+                <View style={styles.sliderGroup}>
+                  <Text style={[styles.sliderLabel, { color: '#94A3B8' }]}>Allowed Geofence Radius: {locRadius}m</Text>
+                  <View style={styles.sliderBar}>
+                    {[50, 100, 150, 200, 300, 400, 500].map((step) => {
+                      const isSelected = locRadius === step;
+                      return (
+                        <TouchableOpacity
+                          key={step}
+                          activeOpacity={0.8}
+                          style={[styles.sliderStep, isSelected && styles.sliderStepActive]}
+                          onPress={() => setLocRadius(step)}
+                        >
+                          <Text style={[styles.sliderStepText, isSelected && styles.sliderStepTextActive]}>
+                            {step}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <Button
+                  title="Create Location Node"
+                  loadingTitle="Creating..."
+                  loading={loading}
+                  disabled={loading}
+                  variant="primary"
+                  onPress={handleAddLocation}
+                  style={styles.submitBtn}
+                />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal: Edit Existing Location Node */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={editLocModalVisible}
+          onRequestClose={() => setEditLocModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Location Node</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setEditLocModalVisible(false)}
+                  style={styles.closeBtn}
+                >
+                  <X size={20} color="#F1F5F9" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
+                <Input
+                  label="Yard / Station Name"
+                  placeholder="e.g. Quarry Hub Gamma"
+                  value={editLocName}
+                  onChangeText={setEditLocName}
+                  required={true}
+                  labelStyle={{ color: '#94A3B8' }}
+                />
+
+                <View style={styles.row}>
+                  <View style={styles.halfWidth}>
+                    <Input
+                      label="Latitude"
+                      placeholder="e.g. 13.0475"
+                      value={editLocLat}
+                      onChangeText={setEditLocLat}
+                      keyboardType="numeric"
+                      required={true}
+                      labelStyle={{ color: '#94A3B8' }}
+                    />
+                  </View>
+                  <View style={styles.halfWidth}>
+                    <Input
+                      label="Longitude"
+                      placeholder="e.g. 80.2089"
+                      value={editLocLng}
+                      onChangeText={setEditLocLng}
+                      keyboardType="numeric"
+                      required={true}
+                      labelStyle={{ color: '#94A3B8' }}
+                    />
+                  </View>
+                </View>
+
+                <PickerField
+                  label="Node Designation Type"
+                  options={['Quarry', 'Unload Site']}
+                  selectedValue={editLocNodeType === 'QUARRY' ? 'Quarry' : 'Unload Site'}
+                  onValueChange={(val) => setEditLocNodeType(val === 'Quarry' ? 'QUARRY' : 'UNLOAD_SITE')}
+                  required={true}
+                  labelStyle={{ color: '#94A3B8' }}
+                />
+
+                <View style={styles.sliderGroup}>
+                  <Text style={[styles.sliderLabel, { color: '#94A3B8' }]}>Allowed Geofence Radius: {editLocRadius}m</Text>
+                  <View style={styles.sliderBar}>
+                    {[50, 100, 150, 200, 300, 400, 500].map((step) => {
+                      const isSelected = editLocRadius === step;
+                      return (
+                        <TouchableOpacity
+                          key={step}
+                          activeOpacity={0.8}
+                          style={[styles.sliderStep, isSelected && styles.sliderStepActive]}
+                          onPress={() => setEditLocRadius(step)}
+                        >
+                          <Text style={[styles.sliderStepText, isSelected && styles.sliderStepTextActive]}>
+                            {step}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <Button
+                  title="Save Changes"
+                  loadingTitle="Saving..."
+                  loading={loading}
+                  disabled={loading}
+                  variant="primary"
+                  onPress={handleEditLocationSubmit}
+                  style={styles.submitBtn}
+                />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal: Edit Material */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={editMatModalVisible}
+          onRequestClose={() => setEditMatModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: 320 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Material Type</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setEditMatModalVisible(false)}
+                  style={styles.closeBtn}
+                >
+                  <X size={20} color="#F1F5F9" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                <Input
+                  label="Material Display Name"
+                  placeholder="e.g. Granite Chips (40mm)"
+                  value={editMatDisplayName}
+                  onChangeText={setEditMatDisplayName}
+                  required={true}
+                  labelStyle={{ color: '#94A3B8' }}
+                />
+                <Button
+                  title="Save Material Name"
+                  loadingTitle="Saving..."
+                  loading={loading}
+                  disabled={loading}
+                  variant="primary"
+                  onPress={handleEditMaterialSubmit}
+                  style={styles.submitBtn}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal: Edit Wheel Type */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={editWheelModalVisible}
+          onRequestClose={() => setEditWheelModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: 380 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Lorry Class</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setEditWheelModalVisible(false)}
+                  style={styles.closeBtn}
+                >
+                  <X size={20} color="#F1F5F9" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                <View style={styles.row}>
+                  <View style={styles.halfWidth}>
+                    <Input
+                      label="Wheel Count"
+                      placeholder="e.g. 10"
+                      value={editWheelCount}
+                      onChangeText={setEditWheelCount}
+                      keyboardType="numeric"
+                      required={true}
+                      labelStyle={{ color: '#94A3B8' }}
+                    />
+                  </View>
+                  <View style={styles.halfWidth}>
+                    <Input
+                      label="Display Label"
+                      placeholder="e.g. 10"
+                      value={editWheelLabel}
+                      onChangeText={setEditWheelLabel}
+                      required={true}
+                      labelStyle={{ color: '#94A3B8' }}
+                    />
+                  </View>
+                </View>
+                <Button
+                  title="Save Configuration"
+                  loadingTitle="Saving..."
+                  loading={loading}
+                  disabled={loading}
+                  variant="primary"
+                  onPress={handleEditWheelSubmit}
+                  style={styles.submitBtn}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -449,7 +1034,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 80,
+    paddingBottom: 260,
   },
   sectionHeader: {
     marginBottom: 20,
@@ -533,6 +1118,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     color: '#34D399',
   },
+  iconActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  iconBtn: {
+    padding: 4,
+  },
   fab: {
     position: 'absolute',
     bottom: 20,
@@ -548,27 +1140,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
-  },
-  chipGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 24,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderColor: '#334155',
-    borderWidth: 1.5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  chipText: {
-    color: '#E2E8F0',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   formCard: {
     backgroundColor: '#1E293B',
@@ -647,7 +1218,7 @@ const styles = StyleSheet.create({
   sliderLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#94A3B8',
     textTransform: 'uppercase',
     marginBottom: 8,
   },

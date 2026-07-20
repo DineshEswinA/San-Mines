@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   FlatList,
   ViewStyle,
   TextInputProps,
+  TextStyle,
+  ScrollView,
 } from 'react-native';
 import { Calendar, Clock, ChevronDown } from 'lucide-react-native';
 
@@ -22,6 +24,7 @@ interface InputProps extends TextInputProps {
   containerStyle?: ViewStyle;
   // If true, restricts inputs to alphanumeric characters (and optional hyphens)
   isAlphanumeric?: boolean;
+  labelStyle?: TextStyle;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -31,6 +34,7 @@ export const Input: React.FC<InputProps> = ({
   containerStyle,
   isAlphanumeric = false,
   onChangeText,
+  labelStyle,
   ...rest
 }) => {
   const handleTextChange = (text: string) => {
@@ -46,7 +50,7 @@ export const Input: React.FC<InputProps> = ({
   return (
     <View style={[styles.container, containerStyle]}>
       <View style={styles.labelRow}>
-        <Text style={styles.label}>
+        <Text style={[styles.label, labelStyle]}>
           {label} {required ? <Text style={styles.asterisk}>*</Text> : <Text style={styles.optional}>(Optional)</Text>}
         </Text>
       </View>
@@ -70,6 +74,7 @@ interface SegmentedControlProps {
   selectedValue: string;
   onValueChange: (value: any) => void;
   containerStyle?: ViewStyle;
+  labelStyle?: TextStyle;
 }
 
 export const SegmentedControl: React.FC<SegmentedControlProps> = ({
@@ -78,10 +83,11 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
   selectedValue,
   onValueChange,
   containerStyle,
+  labelStyle,
 }) => {
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, labelStyle]}>{label}</Text>
       <View style={styles.segmentedContainer}>
         {values.map((val) => {
           const isActive = selectedValue === val;
@@ -123,6 +129,7 @@ interface PickerFieldProps {
   error?: string;
   containerStyle?: ViewStyle;
   disabled?: boolean;
+  labelStyle?: TextStyle;
 }
 
 export const PickerField: React.FC<PickerFieldProps> = ({
@@ -134,12 +141,13 @@ export const PickerField: React.FC<PickerFieldProps> = ({
   error,
   containerStyle,
   disabled = false,
+  labelStyle,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text style={styles.label}>
+      <Text style={[styles.label, labelStyle]}>
         {label} {required ? <Text style={styles.asterisk}>*</Text> : null}
       </Text>
       <TouchableOpacity
@@ -217,6 +225,7 @@ interface DateTimeFieldProps {
   required?: boolean;
   containerStyle?: ViewStyle;
   disabled?: boolean;
+  labelStyle?: TextStyle;
 }
 
 export const DateTimeField: React.FC<DateTimeFieldProps> = ({
@@ -227,30 +236,80 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
   required = false,
   containerStyle,
   disabled = false,
+  labelStyle,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
-  const [tempValue, setTempValue] = useState(value);
+  const [selectedYear, setSelectedYear] = useState('2026');
+  const [selectedMonth, setSelectedMonth] = useState('07');
+  const [selectedDay, setSelectedDay] = useState('19');
+  const [selectedHour, setSelectedHour] = useState('12');
+  const [selectedMinute, setSelectedMinute] = useState('00');
 
-  // Generate realistic simulator choices so user can select easily without typing errors
-  const getSimulatedOptions = () => {
-    if (mode === 'date') {
-      return ['2026-07-04', '2026-07-05', '2026-07-06', '2026-07-07'];
-    } else {
-      // Generate some hours surrounding the current simulated 13:00 time
-      return ['07:30', '08:45', '10:00', '11:15', '12:00', '13:00', '13:15', '14:30', '15:45', '17:00'];
+  useEffect(() => {
+    if (modalVisible && value) {
+      if (mode === 'date') {
+        const parts = value.split('-');
+        if (parts.length === 3) {
+          setSelectedYear(parts[0]);
+          setSelectedMonth(parts[1]);
+          setSelectedDay(parts[2]);
+        }
+      } else {
+        const parts = value.split(':');
+        if (parts.length >= 2) {
+          setSelectedHour(parts[0]);
+          setSelectedMinute(parts[1]);
+        }
+      }
     }
+  }, [modalVisible, value]);
+
+  const handleSave = () => {
+    if (mode === 'date') {
+      onChange(`${selectedYear}-${selectedMonth}-${selectedDay}`);
+    } else {
+      onChange(`${selectedHour}:${selectedMinute}`);
+    }
+    setModalVisible(false);
   };
+
+  const years = ['2025', '2026', '2027'];
+  const months = [
+    { label: 'Jan', val: '01' },
+    { label: 'Feb', val: '02' },
+    { label: 'Mar', val: '03' },
+    { label: 'Apr', val: '04' },
+    { label: 'May', val: '05' },
+    { label: 'Jun', val: '06' },
+    { label: 'Jul', val: '07' },
+    { label: 'Aug', val: '08' },
+    { label: 'Sep', val: '09' },
+    { label: 'Oct', val: '10' },
+    { label: 'Nov', val: '11' },
+    { label: 'Dec', val: '12' },
+  ];
+
+  const getDaysArray = () => {
+    const daysInMonth = new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate();
+    const arr = [];
+    for (let i = 1; i <= daysInMonth; i++) {
+      arr.push(String(i).padStart(2, '0'));
+    }
+    return arr;
+  };
+
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const minutes = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text style={styles.label}>
+      <Text style={[styles.label, labelStyle]}>
         {label} {required ? <Text style={styles.asterisk}>*</Text> : null}
       </Text>
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => {
           if (disabled) return;
-          setTempValue(value);
           setModalVisible(true);
         }}
         style={[
@@ -277,57 +336,100 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
           onPress={() => setModalVisible(false)}
           style={styles.modalOverlay}
         >
-          <View style={[styles.modalContent, { maxHeight: 300 }]}>
-            <Text style={styles.modalTitle}>Set {label}</Text>
-            
-            {/* Quick-tap options */}
-            <FlatList
-              data={getSimulatedOptions()}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.modalItem,
-                    tempValue === item ? styles.modalItemActive : null,
-                  ]}
-                  onPress={() => {
-                    onChange(item);
-                    setModalVisible(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.modalItemText,
-                      tempValue === item ? styles.modalItemTextActive : null,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.modalContent, { maxHeight: '85%', backgroundColor: '#1E293B', borderColor: '#334155', borderWidth: 2 }]}
+          >
+            <Text style={[styles.modalTitle, { color: '#F8FAFC' }]}>Set {label}</Text>
 
-            {/* Custom Input fallback at bottom */}
-            <View style={styles.customDateRow}>
-              <TextInput
-                style={styles.customDateInput}
-                value={tempValue}
-                placeholder={mode === 'date' ? 'YYYY-MM-DD' : 'HH:MM'}
-                onChangeText={setTempValue}
-              />
+            <ScrollView style={{ maxHeight: 400 }} contentContainerStyle={{ paddingBottom: 20 }}>
+              {mode === 'date' ? (
+                <View>
+                  <Text style={styles.pickerSublabel}>YEAR</Text>
+                  <View style={styles.gridRow}>
+                    {years.map(y => (
+                      <TouchableOpacity
+                        key={y}
+                        style={[styles.pillBtn, selectedYear === y && styles.pillBtnActive]}
+                        onPress={() => setSelectedYear(y)}
+                      >
+                        <Text style={[styles.pillText, selectedYear === y && styles.pillTextActive]}>{y}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.pickerSublabel}>MONTH</Text>
+                  <View style={styles.gridContainer}>
+                    {months.map(m => (
+                      <TouchableOpacity
+                        key={m.val}
+                        style={[styles.gridCell, selectedMonth === m.val && styles.gridCellActive]}
+                        onPress={() => setSelectedMonth(m.val)}
+                      >
+                        <Text style={[styles.gridText, selectedMonth === m.val && styles.gridTextActive]}>{m.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.pickerSublabel}>DAY</Text>
+                  <View style={styles.dayGridContainer}>
+                    {getDaysArray().map(d => (
+                      <TouchableOpacity
+                        key={d}
+                        style={[styles.dayCell, selectedDay === d && styles.dayCellActive]}
+                        onPress={() => setSelectedDay(d)}
+                      >
+                        <Text style={[styles.dayText, selectedDay === d && styles.dayTextActive]}>{d}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <View>
+                  <Text style={styles.pickerSublabel}>HOUR (24h)</Text>
+                  <View style={styles.gridContainer}>
+                    {hours.map(h => (
+                      <TouchableOpacity
+                        key={h}
+                        style={[styles.gridCell, selectedHour === h && styles.gridCellActive]}
+                        onPress={() => setSelectedHour(h)}
+                      >
+                        <Text style={[styles.gridText, selectedHour === h && styles.gridTextActive]}>{h}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.pickerSublabel}>MINUTE</Text>
+                  <View style={styles.gridContainer}>
+                    {minutes.map(m => (
+                      <TouchableOpacity
+                        key={m}
+                        style={[styles.gridCell, selectedMinute === m && styles.gridCellActive]}
+                        onPress={() => setSelectedMinute(m)}
+                      >
+                        <Text style={[styles.gridText, selectedMinute === m && styles.gridTextActive]}>{m}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.actionRow}>
               <TouchableOpacity
-                style={styles.customDateSaveBtn}
-                onPress={() => {
-                  if (tempValue.trim() !== '') {
-                    onChange(tempValue);
-                  }
-                  setModalVisible(false);
-                }}
+                style={[styles.actionBtn, styles.cancelBtn]}
+                onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.customDateSaveText}>SAVE</Text>
+                <Text style={styles.actionBtnText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.saveBtn]}
+                onPress={handleSave}
+              >
+                <Text style={styles.actionBtnText}>SAVE</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -496,5 +598,123 @@ const styles = StyleSheet.create({
   customDateSaveText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
+  },
+  // Custom Date/Time Picker styles
+  pickerSublabel: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    marginTop: 14,
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  pillBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+    borderWidth: 1.5,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  pillBtnActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#60A5FA',
+  },
+  pillText: {
+    color: '#94A3B8',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  pillTextActive: {
+    color: '#FFFFFF',
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  gridCell: {
+    width: '23%',
+    paddingVertical: 10,
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+    borderWidth: 1.5,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  gridCellActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#60A5FA',
+  },
+  gridText: {
+    color: '#94A3B8',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  gridTextActive: {
+    color: '#FFFFFF',
+  },
+  dayGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  dayCell: {
+    width: '12.8%',
+    aspectRatio: 1,
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+    borderWidth: 1.5,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  dayCellActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#60A5FA',
+  },
+  dayText: {
+    color: '#94A3B8',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  dayTextActive: {
+    color: '#FFFFFF',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderTopWidth: 1.5,
+    borderTopColor: '#334155',
+    paddingTop: 14,
+    marginTop: 14,
+  },
+  actionBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: '#475569',
+  },
+  saveBtn: {
+    backgroundColor: '#16A34A',
+  },
+  actionBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });

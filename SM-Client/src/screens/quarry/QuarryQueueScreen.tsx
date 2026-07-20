@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -82,6 +83,7 @@ export const QuarryQueueScreen: React.FC = () => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Reload queue from context
   const loadQueue = async () => {
@@ -92,6 +94,18 @@ export const QuarryQueueScreen: React.FC = () => {
       // In case role changes, safety boundary will throw. Handle gracefully.
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchQuarryQueue();
+      await fetchConfigData(true);
+    } catch (err) {
+      console.error('Failed to refresh quarry queue:', err);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -178,6 +192,17 @@ export const QuarryQueueScreen: React.FC = () => {
     acquireGpsLock(null);
   };
 
+  const handleAmountChange = (text: string) => {
+    const cleanNum = text.replace(/[^0-9]/g, '');
+    if (!cleanNum) {
+      setAmount('');
+      return;
+    }
+    const parsed = parseInt(cleanNum, 10);
+    const formatted = new Intl.NumberFormat('en-IN').format(parsed);
+    setAmount(formatted);
+  };
+
   const handleCheckoutSubmit = async () => {
     if (!selectedLorry) return;
 
@@ -187,7 +212,6 @@ export const QuarryQueueScreen: React.FC = () => {
       newErrors.location = 'Dispatch Quarry Location is required';
     }
 
-    // Auto check mandatory Govt stationary number if DIGITAL mode active
     if (transitType === 'DIGITAL') {
       if (!govtStationaryNumber.trim()) {
         newErrors.govtStationaryNumber = 'Govt Stationary Number is mandatory for Digital Transit';
@@ -210,18 +234,10 @@ export const QuarryQueueScreen: React.FC = () => {
       newErrors.netWeight = 'Enter a valid numeric Net Weight (Tons)';
     }
 
-    if (!amount.trim() || isNaN(Number(amount)) || Number(amount) <= 0) {
-      newErrors.amount = 'Enter a valid numeric Amount ($)';
+    const cleanAmount = amount.replace(/,/g, '');
+    if (!amount.trim() || isNaN(Number(cleanAmount)) || Number(cleanAmount) <= 0) {
+      newErrors.amount = 'Enter a valid numeric Amount';
     }
-
-    // Require photos for security verification
-    // if (!transitFormPhoto) {
-    //   newErrors.transitFormPhoto = 'Transit Form capture is required';
-    // }
-
-    // if (!lorryPhoto) {
-    //   newErrors.lorryPhoto = 'Lorry Photo capture is required';
-    // }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -229,21 +245,9 @@ export const QuarryQueueScreen: React.FC = () => {
       return;
     }
 
-    console.log({
-      exitTime,
-      transitType,
-      govtStationaryNumber: transitType === 'DIGITAL' ? govtStationaryNumber.trim() : undefined,
-      dispatchLocationId: selectedLocationId!,
-      materialId: selectedMaterialId!,
-      wheelTypeId: selectedWheelTypeId!,
-      netWeight: Number(netWeight),
-      amount: Number(amount),
-      transitFormPhoto,
-      lorryPhoto,
-      gpsCoordinates,
-    })
+    setErrors({});
+    setLoading(true);
 
-    // Process checkout
     try {
       await checkOutLorry(selectedLorry.id, {
         exitTime,
@@ -253,7 +257,7 @@ export const QuarryQueueScreen: React.FC = () => {
         materialId: selectedMaterialId!,
         wheelTypeId: selectedWheelTypeId!,
         netWeight: Number(netWeight),
-        amount: Number(amount),
+        amount: Number(cleanAmount),
         transitFormPhoto,
         lorryPhoto,
         gpsCoordinates,
@@ -261,7 +265,7 @@ export const QuarryQueueScreen: React.FC = () => {
 
       setModalVisible(false);
       setSelectedLorry(null);
-      await loadQueue(); // Refresh waitlist
+      await loadQueue();
 
       Alert.alert('Dispatch Confirmed', `Vehicle ${selectedLorry.vehicleNumber} dispatched and status changed to IN_TRANSIT.`);
     } catch (err: any) {
@@ -273,11 +277,13 @@ export const QuarryQueueScreen: React.FC = () => {
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.badge}>
-          <Truck size={18} color="#1E40AF" />
+          <Truck size={18} color="#818CF8" />
           <Text style={styles.vehicleNo}>{item.vehicleNumber}</Text>
         </View>
         <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>{item.status}</Text>
+          <Text style={styles.statusText}>
+            {item.status === 'INSIDE_QUARRY' ? 'Inside Quarry' : item.status}
+          </Text>
         </View>
       </View>
 
@@ -321,23 +327,40 @@ export const QuarryQueueScreen: React.FC = () => {
           <Text style={styles.loaderText}>Loading Yard Records...</Text>
         </View>
       ) : quarryList.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Truck size={48} color="#9CA3AF" />
-          <Text style={styles.emptyText}>Yard is Clear</Text>
-          <Text style={styles.emptySubtext}>New vehicles checked-in will appear here immediately.</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+          }
+        >
+          <View style={styles.emptyContainer}>
+            <Truck size={48} color="#9CA3AF" />
+            <Text style={styles.emptyText}>Yard is Clear</Text>
+            <Text style={styles.emptySubtext}>New vehicles checked-in will appear here immediately.</Text>
+          </View>
+        </ScrollView>
       ) : filteredQuarryList.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Truck size={48} color="#9CA3AF" />
-          <Text style={styles.emptyText}>No matching vehicles found</Text>
-          <Text style={styles.emptySubtext}>Try adjusting your search query or time range filter.</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+          }
+        >
+          <View style={styles.emptyContainer}>
+            <Truck size={48} color="#9CA3AF" />
+            <Text style={styles.emptyText}>No matching vehicles found</Text>
+            <Text style={styles.emptySubtext}>Try adjusting your search query or time range filter.</Text>
+          </View>
+        </ScrollView>
       ) : (
         <FlatList
           data={filteredQuarryList}
           keyExtractor={(item) => item.id}
           renderItem={renderLorryCard}
           contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+          }
         />
       )}
 
@@ -364,7 +387,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   onPress={() => setModalVisible(false)}
                   style={styles.closeModalBtn}
                 >
-                  <X size={24} color="#1F2937" />
+                  <X size={24} color="#F8FAFC" />
                 </TouchableOpacity>
               </View>
 
@@ -391,6 +414,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   }}
                   required={true}
                   error={errors.location}
+                  labelStyle={{ color: '#94A3B8' }}
                 />
                 {errors.location ? <Text style={styles.inlineError}>{errors.location}</Text> : null}
 
@@ -401,6 +425,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   onChange={setExitTime}
                   mode="time"
                   required={true}
+                  labelStyle={{ color: '#94A3B8' }}
                 />
 
                 {/* Transit Type (Segmented control) */}
@@ -412,6 +437,7 @@ export const QuarryQueueScreen: React.FC = () => {
                     setTransitType(val);
                     setErrors((prev) => ({ ...prev, govtStationaryNumber: '' }));
                   }}
+                  labelStyle={{ color: '#94A3B8' }}
                 />
 
                 {/* Govt Stationary Number - CONDITIONAL VALIDATION */}
@@ -423,6 +449,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   error={errors.govtStationaryNumber}
                   required={transitType === 'DIGITAL'}
                   isAlphanumeric={true}
+                  labelStyle={{ color: '#94A3B8' }}
                 />
 
                 {/* Material Picker */}
@@ -439,6 +466,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   }}
                   required={true}
                   error={errors.material}
+                  labelStyle={{ color: '#94A3B8' }}
                 />
                 {errors.material ? <Text style={styles.inlineError}>{errors.material}</Text> : null}
 
@@ -479,17 +507,19 @@ export const QuarryQueueScreen: React.FC = () => {
                       keyboardType="numeric"
                       error={errors.netWeight}
                       required={true}
+                      labelStyle={{ color: '#94A3B8' }}
                     />
                   </View>
                   <View style={styles.halfCol}>
                     <Input
-                      label="Amount ($)"
-                      placeholder="e.g. 1450"
+                      label="Amount (INR)"
+                      placeholder="e.g. 1,45,000"
                       value={amount}
-                      onChangeText={setAmount}
+                      onChangeText={handleAmountChange}
                       keyboardType="numeric"
                       error={errors.amount}
                       required={true}
+                      labelStyle={{ color: '#94A3B8' }}
                     />
                   </View>
                 </View>
@@ -518,22 +548,27 @@ export const QuarryQueueScreen: React.FC = () => {
 
                 {/* Hardware Security: GPS lock */}
                 <View style={[styles.gpsReadoutBox, gpsCoordinates ? styles.gpsLocked : styles.gpsLocking]}>
-                  <Compass size={18} color={gpsCoordinates ? '#1E40AF' : '#D97706'} />
-                  <Text style={[styles.gpsReadoutText, gpsCoordinates ? styles.gpsTextLocked : styles.gpsTextLocking]}>
-                    {gpsStatusText}
-                  </Text>
-                  {gpsCoordinates && (
-                    <Text style={styles.gpsCoordinatesDetail}>
-                      {gpsCoordinates.latitude.toFixed(4)}° N, {gpsCoordinates.longitude.toFixed(4)}° E
+                  <Compass size={20} color={gpsCoordinates ? '#10B981' : '#F59E0B'} style={{ marginRight: 10 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.gpsReadoutText, gpsCoordinates ? styles.gpsTextLocked : styles.gpsTextLocking]}>
+                      {gpsStatusText}
                     </Text>
-                  )}
+                    {gpsCoordinates && (
+                      <Text style={styles.gpsCoordinatesDetail}>
+                        {gpsCoordinates.latitude.toFixed(6)}° N, {gpsCoordinates.longitude.toFixed(6)}° E
+                      </Text>
+                    )}
+                  </View>
                 </View>
 
                 {/* Final dispatch button */}
                 <Button
                   title="Complete Quarry Phase & Dispatch"
+                  loadingTitle="Dispatching..."
                   variant="secondary"
                   onPress={handleCheckoutSubmit}
+                  disabled={loading}
+                  loading={loading}
                   style={styles.dispatchBtn}
                 />
               </ScrollView>
@@ -548,13 +583,13 @@ export const QuarryQueueScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#0F172A',
     padding: 16,
   },
   filterSection: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    backgroundColor: '#1E293B',
+    borderWidth: 1.5,
+    borderColor: '#334155',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -595,11 +630,11 @@ const styles = StyleSheet.create({
   boardTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#F8FAFC',
   },
   counterBadge: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    borderColor: '#6366F1',
     borderWidth: 1.5,
     borderRadius: 20,
     paddingHorizontal: 12,
@@ -608,15 +643,15 @@ const styles = StyleSheet.create({
   counterText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#1D4ED8',
+    color: '#818CF8',
   },
   listContainer: {
     paddingBottom: 24,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    backgroundColor: '#1E293B',
+    borderWidth: 1.5,
+    borderColor: '#334155',
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
@@ -634,12 +669,12 @@ const styles = StyleSheet.create({
   vehicleNo: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#F8FAFC',
     marginLeft: 6,
   },
   statusBadge: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#F59E0B',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: '#D97706',
     borderWidth: 1,
     borderRadius: 4,
     paddingHorizontal: 8,
@@ -648,21 +683,21 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#D97706',
+    color: '#F59E0B',
   },
   cardDetails: {
     marginBottom: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: '#334155',
     paddingTop: 8,
   },
   detailLabel: {
     fontSize: 13,
-    color: '#4B5563',
+    color: '#94A3B8',
     marginBottom: 4,
   },
   detailValue: {
-    color: '#1F2937',
+    color: '#F8FAFC',
     fontWeight: '600',
   },
   cardCheckoutBtn: {
@@ -677,7 +712,7 @@ const styles = StyleSheet.create({
   },
   loaderText: {
     marginTop: 12,
-    color: '#4B5563',
+    color: '#94A3B8',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -690,12 +725,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4B5563',
+    color: '#94A3B8',
     marginTop: 12,
   },
   emptySubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#64748B',
     textAlign: 'center',
     marginTop: 4,
     paddingHorizontal: 32,
@@ -703,7 +738,7 @@ const styles = StyleSheet.create({
   // Modal layout styles
   safeContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
   },
   keyboardView: {
     flex: 1,
@@ -714,18 +749,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#334155',
+    backgroundColor: '#0F172A',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#F8FAFC',
   },
   modalSubtitle: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#94A3B8',
     marginTop: 2,
   },
   closeModalBtn: {
@@ -736,7 +771,9 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   summaryBar: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#0F172A',
+    borderColor: '#334155',
+    borderWidth: 1,
     borderRadius: 6,
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -744,7 +781,7 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 12,
-    color: '#4B5563',
+    color: '#94A3B8',
     textAlign: 'center',
   },
   formGroup: {
@@ -753,7 +790,7 @@ const styles = StyleSheet.create({
   tyreLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#94A3B8',
     marginBottom: 8,
     textTransform: 'uppercase',
   },
@@ -765,21 +802,21 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
+    borderColor: '#334155',
     borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 3,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
   },
   tyreBtnActive: {
-    backgroundColor: '#1E40AF',
-    borderColor: '#1E40AF',
+    backgroundColor: '#6366F1',
+    borderColor: '#818CF8',
   },
   tyreBtnText: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#94A3B8',
   },
   tyreBtnTextActive: {
     color: '#FFFFFF',
@@ -800,14 +837,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inlineError: {
-    color: '#DC2626',
+    color: '#EF4444',
     fontSize: 12,
     marginTop: -8,
     marginBottom: 12,
     fontWeight: 'bold',
   },
   camError: {
-    color: '#DC2626',
+    color: '#EF4444',
     fontSize: 11,
     textAlign: 'center',
     marginTop: -8,
@@ -818,36 +855,34 @@ const styles = StyleSheet.create({
   gpsReadoutBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
     marginVertical: 16,
   },
   gpsLocking: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FCD34D',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: '#D97706',
   },
   gpsLocked: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: '#10B981',
   },
   gpsReadoutText: {
     fontSize: 13,
     fontWeight: 'bold',
-    marginLeft: 8,
   },
   gpsTextLocking: {
-    color: '#B45309',
+    color: '#F59E0B',
   },
   gpsTextLocked: {
-    color: '#1D4ED8',
+    color: '#34D399',
   },
   gpsCoordinatesDetail: {
     fontSize: 11,
-    color: '#1E40AF',
-    marginLeft: 8,
+    color: '#34D399',
+    marginTop: 2,
     fontWeight: '600',
   },
   dispatchBtn: {

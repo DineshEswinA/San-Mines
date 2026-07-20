@@ -56,7 +56,7 @@ export const mapApiToUiMaterial = (apiMaterial: string): string => {
 // Generates dynamic Bearer auth headers reading from the active Supabase token
 const getRequestHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
-  console.log("access token: ", session?.access_token);
+  // console.log("access token: ", session?.access_token);
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${session?.access_token || ''}`,
@@ -370,13 +370,17 @@ export const api = {
   },
 
   // 13. PUT /api/config/wheel-types/:id
-  updateWheelType: async (id: number, is_active: boolean): Promise<ApiResponse<any>> => {
+  updateWheelType: async (
+    id: number,
+    updateData: { is_active?: boolean; wheel_count?: number; display_label?: string } | boolean
+  ): Promise<ApiResponse<any>> => {
     try {
       const headers = await getRequestHeaders();
+      const payload = typeof updateData === 'boolean' ? { is_active: updateData } : updateData;
       const response = await fetch(`${API_BASE_URL}/api/config/wheel-types/${id}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ is_active }),
+        body: JSON.stringify(payload),
       });
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
@@ -389,6 +393,165 @@ export const api = {
         return {
           data: null,
           error: `Server error (${response.status}): Expected JSON, got HTML/text. Please ensure the backend server is running and deployed.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 13.b DELETE /api/config/wheel-types/:id
+  deleteWheelType: async (id: number): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/wheel-types/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to delete wheel type' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 13.c PUT /api/config/materials/:id
+  updateMaterial: async (id: number, materialData: { material_name?: string; display_name?: string; is_active?: boolean }): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/materials/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(materialData),
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to update material' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 13.d DELETE /api/config/materials/:id
+  deleteMaterial: async (id: number): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/materials/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to delete material' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 13.e PUT /api/config/locations/:id
+  updateLocation: async (id: number, locationData: { name?: string; node_type?: 'QUARRY' | 'UNLOAD_SITE'; latitude?: number; longitude?: number; allowed_radius_meters?: number; is_active?: boolean }): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/locations/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(locationData),
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to update location' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 13.f DELETE /api/config/locations/:id
+  deleteLocation: async (id: number): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/locations/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to delete location' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text.`
+        };
+      }
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Network request failed' };
+    }
+  },
+
+  // 13.g POST /api/config/wheel-types
+  createWheelType: async (wheelData: { wheel_count: number; display_label: string }): Promise<ApiResponse<any>> => {
+    try {
+      const headers = await getRequestHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/config/wheel-types`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(wheelData),
+      });
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        if (!response.ok) {
+          return { data: null, error: result.message || 'Failed to create wheel type' };
+        }
+        return { data: result, error: null };
+      } else {
+        return {
+          data: null,
+          error: `Server error (${response.status}): Expected JSON, got HTML/text.`
         };
       }
     } catch (err: any) {

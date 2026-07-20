@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
 import { LiveLedgerScreen } from '../screens/admin/LiveLedgerScreen';
 import { MasterConfigScreen } from '../screens/admin/MasterConfigScreen';

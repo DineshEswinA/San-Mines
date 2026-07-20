@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { Button } from '../../components/ui/Button';
 import {
   Globe,
   Phone,
@@ -274,18 +275,15 @@ export const SignupScreen: React.FC<{ onToggleAuthMode: () => void }> = ({ onTog
             {errors.terms ? <Text style={styles.errorText}>{errors.terms}</Text> : null}
 
             {/* Create Account Button */}
-            <TouchableOpacity
-              activeOpacity={0.8}
+            <Button
+              title="Create Account"
+              loadingTitle="Creating Account..."
+              variant="primary"
               onPress={handleSignup}
               disabled={loading}
-              style={[styles.submitBtn, loading ? { opacity: 0.8 } : null]}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.submitBtnText}>Create Account</Text>
-              )}
-            </TouchableOpacity>
+              loading={loading}
+              style={styles.submitBtn}
+            />
 
             {/* Login toggle link */}
             <View style={styles.loginToggleRow}>
@@ -320,7 +318,7 @@ export const SignupScreen: React.FC<{ onToggleAuthMode: () => void }> = ({ onTog
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#0F172A',
   },
   keyboardView: {
     flex: 1,
@@ -345,17 +343,17 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#3B2FD9',
+    color: '#818CF8',
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#F8FAFC',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#475569',
+    color: '#94A3B8',
     lineHeight: 20,
   },
   oauthContainer: {
@@ -365,18 +363,13 @@ const styles = StyleSheet.create({
   oauthBtn: {
     height: 52,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: '#334155',
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E293B',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: 1,
   },
   fakeGoogleLogo: {
     width: 20,
@@ -396,7 +389,7 @@ const styles = StyleSheet.create({
   oauthBtnText: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#F8FAFC',
   },
   dividerRow: {
     flexDirection: 'row',
@@ -407,12 +400,12 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#334155',
   },
   dividerText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#94A3B8',
     marginHorizontal: 16,
     letterSpacing: 1.5,
   },
@@ -425,15 +418,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#374151',
+    color: '#94A3B8',
     marginBottom: 8,
   },
   inputWrapper: {
     height: 52,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: '#334155',
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -448,7 +441,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     fontSize: 16,
-    color: '#0F172A',
+    color: '#F8FAFC',
   },
   eyeBtn: {
     padding: 8,
@@ -475,17 +468,17 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderWidth: 1.5,
-    borderColor: '#94A3B8',
+    borderColor: '#334155',
     borderRadius: 4,
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F172A',
     marginTop: 1,
   },
   checkboxChecked: {
-    borderColor: '#3B2FD9',
-    backgroundColor: '#3B2FD9',
+    borderColor: '#6366F1',
+    backgroundColor: '#6366F1',
   },
   checkboxError: {
     borderColor: '#EF4444',
@@ -499,23 +492,19 @@ const styles = StyleSheet.create({
   checkboxLabel: {
     flex: 1,
     fontSize: 13,
-    color: '#475569',
+    color: '#94A3B8',
     lineHeight: 18,
   },
   termsLink: {
-    color: '#3B2FD9',
+    color: '#818CF8',
     fontWeight: '600',
   },
   submitBtn: {
     height: 54,
-    backgroundColor: '#3B2FD9',
+    backgroundColor: '#6366F1',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#3B2FD9',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
     elevation: 3,
   },
   submitBtnText: {
@@ -534,16 +523,16 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#94A3B8',
   },
   toggleLink: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#3B2FD9',
+    color: '#818CF8',
   },
   lineSpacer: {
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#334155',
     marginVertical: 24,
   },
   encryptionFooterBar: {

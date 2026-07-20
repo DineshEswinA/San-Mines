@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { RefreshCw, Truck, MapPin, AlertOctagon, ShieldAlert, Navigation } from 'lucide-react-native';
+import { RefreshCw, Truck, MapPin, AlertOctagon, ShieldAlert, Navigation, ShieldCheck } from 'lucide-react-native';
 import Svg, { Circle, Line, Rect, G, Text as SvgText } from 'react-native-svg';
 
 // Helper function to calculate distance using Haversine formula
@@ -37,7 +37,7 @@ export const AdminDashboardScreen: React.FC = () => {
   // Stats computed from active database records
   const [yardQueueCount, setYardQueueCount] = useState(0);
   const [enRouteCount, setEnRouteCount] = useState(0);
-  const [breachCount, setBreachCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -51,36 +51,21 @@ export const AdminDashboardScreen: React.FC = () => {
         // Compute metrics
         let queue = 0;
         let transit = 0;
-        let breaches = 0;
+        let completed = 0;
 
         rawTrips.forEach((trip: any) => {
           if (trip.status === 'INSIDE_QUARRY') {
             queue++;
           } else if (trip.status === 'IN_TRANSIT') {
             transit++;
-          }
-
-          // Evaluate Geofence breaches for check-out coordinates
-          if (trip.quarryGpsLat && trip.quarryGpsLong && trip.dispatchLocationId) {
-            const loc = locations.find((l) => Number(l.id) === Number(trip.dispatchLocationId));
-            if (loc) {
-              const dist = getDistance(
-                Number(trip.quarryGpsLat),
-                Number(trip.quarryGpsLong),
-                Number(loc.latitude),
-                Number(loc.longitude)
-              );
-              const allowedRadius = Number(loc.allowed_radius_meters || 100);
-              if (dist > allowedRadius) {
-                breaches++;
-              }
-            }
+          } else if (trip.status === 'UNLOADED') {
+            completed++;
           }
         });
 
         setYardQueueCount(queue);
         setEnRouteCount(transit);
-        setBreachCount(breaches);
+        setCompletedCount(completed);
       }
     } catch (err) {
       console.error('Failed to fetch dashboard records:', err);
@@ -141,14 +126,14 @@ export const AdminDashboardScreen: React.FC = () => {
           <Text style={styles.cardLabel}>Vehicles Active</Text>
         </View>
 
-        {/* Card 3: Breaches (High-visibility red border card) */}
-        <View style={[styles.metricCard, styles.breachCard]}>
+        {/* Card 3: Completed (Green border card) */}
+        <View style={[styles.metricCard, styles.completedCard]}>
           <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, styles.textRed]}>Breaches</Text>
-            <ShieldAlert size={18} color="#F87171" />
+            <Text style={[styles.cardTitle, styles.textGreen]}>Completed</Text>
+            <ShieldCheck size={18} color="#10B981" />
           </View>
-          <Text style={[styles.cardValue, styles.textRed]}>{breachCount}</Text>
-          <Text style={styles.cardLabel}>Geofence Alerts</Text>
+          <Text style={[styles.cardValue, styles.textGreen]}>{completedCount}</Text>
+          <Text style={styles.cardLabel}>Trips Archived</Text>
         </View>
       </View>
 
@@ -394,6 +379,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E293B',
     borderColor: '#EF4444', // High-visibility red border
   },
+  completedCard: {
+    backgroundColor: '#1E293B',
+    borderColor: '#10B981', // Safety/Completed Green border
+  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -420,6 +409,9 @@ const styles = StyleSheet.create({
   },
   textRed: {
     color: '#F87171',
+  },
+  textGreen: {
+    color: '#10B981',
   },
   mapContainer: {
     backgroundColor: '#1E293B',

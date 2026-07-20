@@ -100,7 +100,7 @@ interface AuthContextType {
       unloadDate: string;
       unloadEntryTime: string;
       unloadingLocationId: number;
-      unloadExitTime: string;
+      unloadExitTime?: string;
       unloadPhoto?: string;
     }
   ) => Promise<void>;
@@ -112,7 +112,20 @@ interface AuthContextType {
   materials: any[];
   wheelTypes: any[];
   locations: any[];
-  fetchConfigData: () => Promise<void>;
+  fetchConfigData: (force?: boolean) => Promise<void>;
+
+  // Local Memory Updaters for instant UI reflection without GET requests
+  addLocationState: (location: any) => void;
+  updateLocationState: (id: number, location: any) => void;
+  removeLocationState: (id: number) => void;
+
+  addMaterialState: (material: any) => void;
+  updateMaterialState: (id: number, material: any) => void;
+  removeMaterialState: (id: number) => void;
+
+  addWheelTypeState: (wheelType: any) => void;
+  updateWheelTypeState: (id: number, wheelType: any) => void;
+  removeWheelTypeState: (id: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -133,7 +146,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [wheelTypes, setWheelTypes] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
 
-  const fetchConfigData = async () => {
+  // Local Memory Mutation Helpers
+  const addLocationState = (location: any) => {
+    setLocations((prev) => [location, ...prev]);
+  };
+  const updateLocationState = (id: number, updated: any) => {
+    setLocations((prev) => prev.map((l) => (Number(l.id) === Number(id) ? { ...l, ...updated } : l)));
+  };
+  const removeLocationState = (id: number) => {
+    setLocations((prev) => prev.filter((l) => Number(l.id) !== Number(id)));
+  };
+
+  const addMaterialState = (material: any) => {
+    setMaterials((prev) => [...prev, material]);
+  };
+  const updateMaterialState = (id: number, updated: any) => {
+    setMaterials((prev) => prev.map((m) => (Number(m.id) === Number(id) ? { ...m, ...updated } : m)));
+  };
+  const removeMaterialState = (id: number) => {
+    setMaterials((prev) => prev.filter((m) => Number(m.id) !== Number(id)));
+  };
+
+  const addWheelTypeState = (wheelType: any) => {
+    setWheelTypes((prev) => [...prev, wheelType].sort((a, b) => a.wheel_count - b.wheel_count));
+  };
+  const updateWheelTypeState = (id: number, updated: any) => {
+    setWheelTypes((prev) => prev.map((w) => (Number(w.id) === Number(id) ? { ...w, ...updated } : w)));
+  };
+  const removeWheelTypeState = (id: number) => {
+    setWheelTypes((prev) => prev.filter((w) => Number(w.id) !== Number(id)));
+  };
+
+  const fetchConfigData = async (force: boolean = false) => {
+    // Avoid making 3 redundant network requests if config is already cached in memory
+    if (!force && materials.length > 0 && wheelTypes.length > 0 && locations.length > 0) {
+      return;
+    }
     const [mRes, wRes, lRes] = await Promise.all([
       api.getMaterials(),
       api.getWheelTypes(),
@@ -344,7 +392,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchQuarryQueue = async () => {
     assertQuarryAccess();
-    const res = await api.getTrips();
+    const res = await api.getTrips('INSIDE_QUARRY');
     if (res.error) {
       throw new Error(res.error);
     }
@@ -364,7 +412,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchIncomingFleet = async () => {
     assertUnloadAccess();
-    if (materials.length === 0 || wheelTypes.length === 0) {
+    if (materials.length === 0 || wheelTypes.length === 0 || locations.length === 0) {
       await fetchConfigData();
     }
     const res = await api.getTrips();
@@ -372,14 +420,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error(res.error);
     }
     if (res.data && res.data.trips) {
-      const mapped: QuarryCheckOut[] = res.data.trips.map((trip: any) => {
-        const mat = materials.find(m => m.id === trip.materialId);
+      const activeTransit: QuarryCheckOut[] = [];
+      const completed: UnloadVerification[] = [];
+
+      const extractTimePart = (isoStr: string | null): string => {
+        if (!isoStr) return '';
+        const date = new Date(isoStr);
+        if (isNaN(date.getTime())) return '';
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`;
+      };
+
+      res.data.trips.forEach((trip: any) => {
+        const mat = materials.find(m => Number(m.id) === Number(trip.materialId));
         const materialDisplayName = mat ? mat.display_name : `Material #${trip.materialId}`;
 
-        const wheel = wheelTypes.find(w => w.id === trip.wheelTypeId);
+        const wheel = wheelTypes.find(w => Number(w.id) === Number(trip.wheelTypeId));
         const tyreCount = wheel ? wheel.wheel_count : 10;
 
-        return {
+        const mappedTrip = {
           id: String(trip.id),
           transporterName: trip.transporterName,
           vehicleNumber: trip.vehicleNumber,
@@ -394,8 +454,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           gpsCoordinates: trip.quarryGpsLat ? { latitude: Number(trip.quarryGpsLat), longitude: Number(trip.quarryGpsLong) } : null,
           status: trip.status || 'IN_TRANSIT',
         };
+
+        if (trip.status === 'UNLOADED') {
+          const loc = locations.find(l => Number(l.id) === Number(trip.unloadingLocationId));
+          const unloadLocationName = loc ? loc.name : `Unload Site #${trip.unloadingLocationId}`;
+
+          completed.push({
+            ...mappedTrip,
+            unloadDate: formatDateOnly(trip.unloadDate || trip.unloadEntryTime),
+            unloadEntryTime: extractTimePart(trip.unloadEntryTime),
+            unloadingLocation: unloadLocationName,
+            unloadExitTime: extractTimePart(trip.unloadExitTime),
+            unloadPhoto: trip.unloadingPhotoUrl,
+            status: 'UNLOADED',
+          });
+        } else if (trip.status === 'IN_TRANSIT') {
+          activeTransit.push(mappedTrip);
+        }
       });
-      setTransitFleet(mapped);
+
+      setTransitFleet(activeTransit);
+      setCompletedArchives(completed);
     }
   };
 
@@ -472,7 +551,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       unloadDate: string;
       unloadEntryTime: string;
       unloadingLocationId: number;
-      unloadExitTime: string;
+      unloadExitTime?: string;
       unloadPhoto?: string;
     }
   ) => {
@@ -480,8 +559,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const lorryToVerify = transitFleet.find((l) => l.id === id);
     if (!lorryToVerify) throw new Error('Vehicle not found in incoming fleet queue');
 
+    const finalExitTime = verificationData.unloadExitTime || verificationData.unloadEntryTime;
+
     const isoUnloadEntryTime = `${verificationData.unloadDate}T${verificationData.unloadEntryTime}:00.000Z`;
-    const isoUnloadExitTime = `${verificationData.unloadDate}T${verificationData.unloadExitTime}:00.000Z`;
+    const isoUnloadExitTime = `${verificationData.unloadDate}T${finalExitTime}:00.000Z`;
 
     const selectedLoc = locations.find(l => l.id === verificationData.unloadingLocationId);
     const userLat = selectedLoc ? Number(selectedLoc.latitude) : 12.971600;
@@ -507,7 +588,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       unloadDate: verificationData.unloadDate,
       unloadEntryTime: verificationData.unloadEntryTime,
       unloadingLocation: unloadLocationName,
-      unloadExitTime: verificationData.unloadExitTime,
+      unloadExitTime: finalExitTime,
       unloadPhoto: verificationData.unloadPhoto,
       status: 'UNLOADED',
     };
@@ -539,6 +620,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         wheelTypes,
         locations,
         fetchConfigData,
+        addLocationState,
+        updateLocationState,
+        removeLocationState,
+        addMaterialState,
+        updateMaterialState,
+        removeMaterialState,
+        addWheelTypeState,
+        updateWheelTypeState,
+        removeWheelTypeState,
       }}
     >
       {children}

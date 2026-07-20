@@ -10,6 +10,7 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useAuth, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
 import { api } from '../../lib/api';
@@ -38,7 +39,8 @@ export const LiveLedgerScreen: React.FC = () => {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'INSIDE' | 'TRANSIT' | 'FLAGGED'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'INSIDE' | 'TRANSIT' | 'COMPLETED' | 'FLAGGED'>('ALL');
+  const [refreshing, setRefreshing] = useState(false);
 
   // Supervisor modal detail state
   const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
@@ -64,6 +66,17 @@ export const LiveLedgerScreen: React.FC = () => {
       Alert.alert('Load Error', 'Failed to retrieve logs from backend: ' + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadData();
+    } catch (err) {
+      console.error('Failed to refresh ledger:', err);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -112,6 +125,9 @@ export const LiveLedgerScreen: React.FC = () => {
     if (activeFilter === 'TRANSIT') {
       return trip.status === 'IN_TRANSIT';
     }
+    if (activeFilter === 'COMPLETED') {
+      return trip.status === 'UNLOADED';
+    }
     if (activeFilter === 'FLAGGED') {
       return analyzeGeofenceBreach(trip);
     }
@@ -149,7 +165,7 @@ export const LiveLedgerScreen: React.FC = () => {
         return (
           <View style={[styles.badge, styles.badgeGreen]}>
             <ShieldCheck size={12} color="#059669" style={{ marginRight: 4 }} />
-            <Text style={[styles.badgeText, styles.textGreen]}>Secure</Text>
+            <Text style={[styles.badgeText, styles.textGreen]}>Completed</Text>
           </View>
         );
       default:
@@ -216,6 +232,15 @@ export const LiveLedgerScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={[styles.pill, activeFilter === 'COMPLETED' && styles.pillActive]}
+            onPress={() => setActiveFilter('COMPLETED')}
+          >
+            <Text style={[styles.pillText, activeFilter === 'COMPLETED' && styles.pillTextActive]}>
+              Completed
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.pill, activeFilter === 'FLAGGED' && styles.pillActiveFlagged]}
             onPress={() => setActiveFilter('FLAGGED')}
           >
@@ -236,6 +261,9 @@ export const LiveLedgerScreen: React.FC = () => {
           data={filteredTrips}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity
               activeOpacity={0.85}
