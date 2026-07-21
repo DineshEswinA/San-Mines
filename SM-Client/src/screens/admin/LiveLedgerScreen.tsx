@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useAuth, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { SearchBar } from '../../components/ui/SearchBar';
+import { SearchBar } from '../../components/ui';
 import { Truck, X, Clock, Calendar, ShieldCheck, ShieldAlert, User, Image as ImageIcon } from 'lucide-react-native';
 
 // Helper function to calculate distance using Haversine formula

@@ -5,7 +5,6 @@ import Constants from 'expo-constants';
 // Declare global React Native __DEV__ variable for TypeScript compiler if needed
 declare const __DEV__: boolean;
 
-console.log("EXPO_PUBLIC_API_URL - " + process.env.EXPO_PUBLIC_API_URL);
 let API_BASE_URL = __DEV__
   ? (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000')
   : 'https://san-mines.vercel.app';

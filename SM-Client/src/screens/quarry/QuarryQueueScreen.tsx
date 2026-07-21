@@ -16,11 +16,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useAuth, QuarryCheckIn, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
-import { Button } from '../../components/ui/Button';
-import { Input, SegmentedControl, PickerField, DateTimeField } from '../../components/ui/Input';
-import { SearchBar } from '../../components/ui/SearchBar';
-import { CameraBox } from '../../components/ui/CameraBox';
+
 import { Truck, Compass, CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
+import { Button, Input, SegmentedControl, PickerField, DateTimeField, SearchBar, CameraBox } from '../../components/ui';
 
 export const QuarryQueueScreen: React.FC = () => {
   const {
@@ -434,7 +432,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   values={['MANUAL', 'DIGITAL']}
                   selectedValue={transitType}
                   onValueChange={(val) => {
-                    setTransitType(val);
+                    setTransitType(val as 'MANUAL' | 'DIGITAL');
                     setErrors((prev) => ({ ...prev, govtStationaryNumber: '' }));
                   }}
                   labelStyle={{ color: '#94A3B8' }}

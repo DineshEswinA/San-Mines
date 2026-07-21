@@ -16,11 +16,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth, QuarryCheckOut, UnloadVerification, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
-import { SearchBar } from '../../components/ui/SearchBar';
-import { Button } from '../../components/ui/Button';
-import { Input, DateTimeField, PickerField } from '../../components/ui/Input';
-import { CameraBox } from '../../components/ui/CameraBox';
+
 import { Truck, CheckCircle2, ShieldCheck, MapPin, X, History, Route } from 'lucide-react-native';
+import { SearchBar, Button, Input, DateTimeField, PickerField, CameraBox } from '../../components/ui';
 
 export const IncomingFleetScreen: React.FC = () => {
   const {

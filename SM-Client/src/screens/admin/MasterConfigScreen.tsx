@@ -15,9 +15,9 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { Input, PickerField } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
+
 import { MapPin, Plus, Layers, Disc, Trash2, Edit2, X } from 'lucide-react-native';
+import { Input, PickerField, Button } from '../../components/ui';
 
 export const MasterConfigScreen: React.FC = () => {
   const {

@@ -15,8 +15,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { User, Shield, Check, RefreshCw, UserPlus, X } from 'lucide-react-native';
-import { Input, PickerField } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
+import { Input, PickerField, Button } from '../../components/ui';
 
 export const UserManagementScreen: React.FC = () => {
   const { role: currentUserRole, logout } = useAuth();

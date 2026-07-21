@@ -2,6 +2,10 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { formatTimeTo12Hour, formatDateOnly } from '../utils/format';
+
+// Re-export so existing screens that import from AuthContext keep working
+export { formatTimeTo12Hour, formatDateOnly } from '../utils/format';
 
 export type Role = 'QUARRY_OPERATOR' | 'UNLOAD_OPERATOR' | 'SUPER_ADMIN';
 
@@ -29,25 +33,6 @@ export interface QuarryCheckOut extends Omit<QuarryCheckIn, 'status'> {
   } | null;
   status: 'IN_TRANSIT' | 'UNLOADED';
 }
-
-export const formatTimeTo12Hour = (epoch: number | string | Date): string => {
-  if (!epoch) return '';
-  const date = new Date(epoch);
-  if (isNaN(date.getTime())) return '';
-  let hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12;
-  hours = hours ? hours : 12; // the hour '0' should be '12'
-  return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
-};
-
-export const formatDateOnly = (epoch: number | string | Date): string => {
-  if (!epoch) return '';
-  const date = new Date(epoch);
-  if (isNaN(date.getTime())) return '';
-  return date.toISOString().split('T')[0];
-};
 
 export interface UnloadVerification extends Omit<QuarryCheckOut, 'status'> {
   unloadDate: string;

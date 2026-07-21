@@ -9,9 +9,9 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import { Input, DateTimeField } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
+
 import { ClipboardList } from 'lucide-react-native';
+import { Input, DateTimeField, Button } from '../../components/ui';
 
 interface CheckInScreenProps {
   onSuccess: () => void; // Callback to switch tab to the Queue board
