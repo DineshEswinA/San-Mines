@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
-  Modal,
   StatusBar as RNStatusBar,
   Platform,
   Alert,
@@ -17,7 +16,7 @@ import { QuarryQueueScreen } from './src/screens/quarry/QuarryQueueScreen';
 import { IncomingFleetScreen } from './src/screens/unload/IncomingFleetScreen';
 import { LoginScreen } from './src/screens/auth/LoginScreen';
 import { SignupScreen } from './src/screens/auth/SignupScreen';
-import { HardDrive, User, ChevronDown, Check, ClipboardCheck, ListFilter, LogOut } from 'lucide-react-native';
+import { User, ClipboardCheck, ListFilter, LogOut } from 'lucide-react-native';
 import { SplashScreen } from './src/screens/Splash/SplashScreen';
 import { AdminNavigator } from './src/navigation/AdminNavigator';
 import Svg, { Path, Defs, LinearGradient, RadialGradient, Stop, Circle } from 'react-native-svg';
@@ -63,7 +62,7 @@ const BrandLogo: React.FC<{ size?: number }> = ({ size = 26 }) => {
 };
 
 const MainAppContent: React.FC = () => {
-  const { role, setRole, isSuperAdmin, isAuthenticated, logout, isLoading } = useAuth();
+  const { role, isAuthenticated, logout, isLoading } = useAuth();
 
   const handleLogoutPress = () => {
     Alert.alert(
@@ -78,9 +77,6 @@ const MainAppContent: React.FC = () => {
 
   // Quarry Operator active tab: 'checkin' | 'queue'
   const [quarryTab, setQuarryTab] = useState<'checkin' | 'queue'>('checkin');
-
-  // Profile dropdown visibility
-  const [dropdownVisible, setDropdownVisible] = useState(false);
 
   // Authentication mode ('login' | 'signup')
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -105,140 +101,37 @@ const MainAppContent: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
 
-      {/* 1. Mocked Top-Bar Header */}
+      {/* 1. Top-Bar Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <BrandLogo size={28} />
           <Text style={[styles.logoText, { marginLeft: 6 }]}>SAN MINES</Text>
         </View>
 
-        {/* Profile Simulator Dropdown Trigger */}
-        {isSuperAdmin ? (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setDropdownVisible(true)}
-            style={[
-              styles.profileTrigger,
-              role === 'QUARRY_OPERATOR' ? styles.profileQuarry : role === 'UNLOAD_OPERATOR' ? styles.profileUnload : styles.profileAdmin,
-            ]}
-          >
-            <User size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.profileTriggerText}>
-              {role === 'QUARRY_OPERATOR' ? 'Quarry User (Sim)' : role === 'UNLOAD_OPERATOR' ? 'Unload User (Sim)' : 'Super Admin'}
-            </Text>
-            <ChevronDown size={14} color="#FFFFFF" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleLogoutPress}
-            style={[
-              styles.profileTrigger,
-              role === 'QUARRY_OPERATOR' ? styles.profileQuarry : styles.profileUnload,
-            ]}
-          >
-            <User size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.profileTriggerText}>
-              {role === 'QUARRY_OPERATOR' ? 'Quarry Operator' : 'Unload Operator'}
-            </Text>
-            <LogOut size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* 2. Global Role Switcher Modal (Simulator Dropdown) */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={dropdownVisible}
-        onRequestClose={() => setDropdownVisible(false)}
-      >
+        {/* User Account Badge & Disconnect Action */}
         <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setDropdownVisible(false)}
-          style={styles.dropdownOverlay}
+          activeOpacity={0.8}
+          onPress={handleLogoutPress}
+          style={[
+            styles.profileTrigger,
+            role === 'QUARRY_OPERATOR'
+              ? styles.profileQuarry
+              : role === 'UNLOAD_OPERATOR'
+              ? styles.profileUnload
+              : styles.profileAdmin,
+          ]}
         >
-          <View style={styles.dropdownMenu}>
-            <Text style={styles.dropdownTitle}>SIMULATE LOGGED IN OPERATOR</Text>
-
-            {/* Quarry Operator selection */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                setRole('QUARRY_OPERATOR');
-                setDropdownVisible(false);
-              }}
-              style={[
-                styles.dropdownItem,
-                role === 'QUARRY_OPERATOR' ? styles.dropdownItemActive : null,
-              ]}
-            >
-              <View style={styles.dropdownItemLeft}>
-                <View style={[styles.avatarDot, { backgroundColor: '#1E40AF' }]} />
-                <Text style={styles.dropdownItemText}>Logged in as: Quarry User</Text>
-              </View>
-              {role === 'QUARRY_OPERATOR' && <Check size={18} color="#1E40AF" />}
-            </TouchableOpacity>
-
-            {/* Unload Operator selection */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                setRole('UNLOAD_OPERATOR');
-                setDropdownVisible(false);
-              }}
-              style={[
-                styles.dropdownItem,
-                role === 'UNLOAD_OPERATOR' ? styles.dropdownItemActive : null,
-              ]}
-            >
-              <View style={styles.dropdownItemLeft}>
-                <View style={[styles.avatarDot, { backgroundColor: '#16A34A' }]} />
-                <Text style={styles.dropdownItemText}>Logged in as: Unload User</Text>
-              </View>
-              {role === 'UNLOAD_OPERATOR' && <Check size={18} color="#16A34A" />}
-            </TouchableOpacity>
-
-            {/* Super Admin selection */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                setRole('SUPER_ADMIN');
-                setDropdownVisible(false);
-              }}
-              style={[
-                styles.dropdownItem,
-                role === 'SUPER_ADMIN' ? styles.dropdownItemActive : null,
-              ]}
-            >
-              <View style={styles.dropdownItemLeft}>
-                <View style={[styles.avatarDot, { backgroundColor: '#6366F1' }]} />
-                <Text style={styles.dropdownItemText}>Logged in as: Super Admin</Text>
-              </View>
-              {role === 'SUPER_ADMIN' && <Check size={18} color="#6366F1" />}
-            </TouchableOpacity>
-
-            {/* Simulated Logout Selection */}
-            <View style={styles.dropdownDivider} />
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                setDropdownVisible(false);
-                logout();
-              }}
-              style={styles.dropdownItem}
-            >
-              <View style={styles.dropdownItemLeft}>
-                <LogOut size={16} color="#EF4444" style={{ marginRight: 10 }} />
-                <Text style={[styles.dropdownItemText, { color: '#EF4444', fontWeight: 'bold' }]}>
-                  Log Out Session
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+          <User size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+          <Text style={styles.profileTriggerText}>
+            {role === 'SUPER_ADMIN'
+              ? 'Super Admin'
+              : role === 'UNLOAD_OPERATOR'
+              ? 'Unload Operator'
+              : 'Quarry Operator'}
+          </Text>
+          <LogOut size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
         </TouchableOpacity>
-      </Modal>
+      </View>
 
       {/* 3. Screen Hot-swapping & Tab layout depending on current role context */}
       <View style={styles.body}>

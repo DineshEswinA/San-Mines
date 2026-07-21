@@ -233,7 +233,7 @@ export const QuarryQueueScreen: React.FC = () => {
     }
 
     const cleanAmount = amount.replace(/,/g, '');
-    if (!amount.trim() || isNaN(Number(cleanAmount)) || Number(cleanAmount) <= 0) {
+    if (amount.trim() && (isNaN(Number(cleanAmount)) || Number(cleanAmount) < 0)) {
       newErrors.amount = 'Enter a valid numeric Amount';
     }
 
@@ -255,7 +255,7 @@ export const QuarryQueueScreen: React.FC = () => {
         materialId: selectedMaterialId!,
         wheelTypeId: selectedWheelTypeId!,
         netWeight: Number(netWeight),
-        amount: Number(cleanAmount),
+        amount: amount.trim() ? Number(cleanAmount) : 0,
         transitFormPhoto,
         lorryPhoto,
         gpsCoordinates,
@@ -295,7 +295,7 @@ export const QuarryQueueScreen: React.FC = () => {
       </View>
 
       <Button
-        title="Process Quarry Check-Out"
+        title="Dispatch Vehicle"
         variant="outline"
         onPress={() => handleOpenCheckout(item)}
         style={styles.cardCheckoutBtn}
@@ -377,7 +377,7 @@ export const QuarryQueueScreen: React.FC = () => {
             >
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalTitle}>Quarry Check-Out Phase</Text>
+                  <Text style={styles.modalTitle}>Dispatch Lorry (Quarry Check-Out)</Text>
                   <Text style={styles.modalSubtitle}>Dispatching {selectedLorry.vehicleNumber}</Text>
                 </View>
                 <TouchableOpacity
@@ -516,7 +516,7 @@ export const QuarryQueueScreen: React.FC = () => {
                       onChangeText={handleAmountChange}
                       keyboardType="numeric"
                       error={errors.amount}
-                      required={true}
+                      required={false}
                       labelStyle={{ color: '#94A3B8' }}
                     />
                   </View>
@@ -526,7 +526,7 @@ export const QuarryQueueScreen: React.FC = () => {
                 <View style={styles.cameraRow}>
                   <View style={styles.cameraCol}>
                     <CameraBox
-                      label="[Capture Transit Form]"
+                      label="Transit Form"
                       photoUri={transitFormPhoto}
                       onPhotoCaptured={setTransitFormPhoto}
                       onPhotoCleared={() => setTransitFormPhoto(undefined)}
@@ -535,7 +535,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   </View>
                   <View style={styles.cameraCol}>
                     <CameraBox
-                      label="[Capture Lorry Photo]"
+                      label="Lorry Photo"
                       photoUri={lorryPhoto}
                       onPhotoCaptured={setLorryPhoto}
                       onPhotoCleared={() => setLorryPhoto(undefined)}
@@ -561,7 +561,7 @@ export const QuarryQueueScreen: React.FC = () => {
 
                 {/* Final dispatch button */}
                 <Button
-                  title="Complete Quarry Phase & Dispatch"
+                  title="Confirm & Dispatch Lorry"
                   loadingTitle="Dispatching..."
                   variant="secondary"
                   onPress={handleCheckoutSubmit}

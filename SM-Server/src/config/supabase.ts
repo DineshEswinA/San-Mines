@@ -15,6 +15,14 @@ if (!supabaseServiceRoleKey) {
   throw new Error('Configuration error: SUPABASE_SERVICE_ROLE_KEY environment variable is missing.');
 }
 
+if (supabaseServiceRoleKey.startsWith('sb_publishable_')) {
+  console.warn(
+    '⚠️ [SUPABASE CONFIG WARNING] SUPABASE_SERVICE_ROLE_KEY is set to an ANON/PUBLISHABLE key (sb_publishable_...).\n' +
+    '   Administrative endpoints like supabase.auth.admin.createUser() WILL FAIL with "This endpoint requires a valid Bearer token".\n' +
+    '   Please update SUPABASE_SERVICE_ROLE_KEY in SM-Server/.env with your Supabase service_role secret key.'
+  );
+}
+
 // Initialize the @supabase/supabase-js client using administrative SERVICE_ROLE_KEY
 export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
@@ -22,3 +30,4 @@ export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
     autoRefreshToken: false,
   },
 });
+

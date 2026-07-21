@@ -26,7 +26,7 @@ export const AdminNavigator: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* 1. Main Viewport */}
       <View style={styles.body}>{renderActiveScreen()}</View>
 
@@ -80,7 +80,7 @@ export const AdminNavigator: React.FC = () => {
           </Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

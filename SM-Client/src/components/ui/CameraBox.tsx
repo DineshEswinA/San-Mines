@@ -85,20 +85,19 @@ export const CameraBox: React.FC<CameraBoxProps> = ({
           <Image source={{ uri: photoUri }} style={styles.previewImage} />
           <View style={styles.overlay}>
             <View style={styles.badge}>
-              <CheckCircle2 size={16} color={colors.success.default} />
+              <CheckCircle2 size={14} color={colors.success.default} />
               <Text style={styles.badgeText}>CAPTURED</Text>
             </View>
             <TouchableOpacity activeOpacity={0.8} onPress={onPhotoCleared} style={styles.retakeBtn}>
-              <RefreshCw size={16} color={colors.white} />
+              <RefreshCw size={14} color={colors.white} />
               <Text style={styles.retakeBtnText}>RETAKE</Text>
             </TouchableOpacity>
           </View>
         </View>
       ) : (
         <TouchableOpacity activeOpacity={0.7} onPress={handleOpenScanner} style={styles.captureBox}>
-          <CameraIcon size={32} color={colors.primary.default} />
-          <Text style={styles.captureText}>Tap to Capture</Text>
-          <Text style={styles.subCaptureText}>Camera Lock Enabled</Text>
+          <CameraIcon size={24} color="#818CF8" />
+          <Text style={styles.captureText}>Take Photo</Text>
         </TouchableOpacity>
       )}
 
@@ -106,8 +105,8 @@ export const CameraBox: React.FC<CameraBoxProps> = ({
         <View style={styles.modalContainer}>
           {loading ? (
             <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color={colors.primary.default} />
-              <Text style={styles.loaderText}>Initializing Hardware Interface...</Text>
+              <ActivityIndicator size="large" color="#6366F1" />
+              <Text style={styles.loaderText}>Opening Camera...</Text>
             </View>
           ) : permission?.granted && !isSimulatorMock ? (
             <CameraView style={styles.cameraView} ref={cameraRef}>
@@ -120,7 +119,7 @@ export const CameraBox: React.FC<CameraBoxProps> = ({
                 </View>
                 <View style={styles.cameraFooter}>
                   <TouchableOpacity activeOpacity={0.8} onPress={handleSimulate} style={styles.simulationBtn}>
-                    <Text style={styles.simulationBtnText}>Use Simulated Photo</Text>
+                    <Text style={styles.simulationBtnText}>Use Sample Photo</Text>
                   </TouchableOpacity>
                   <TouchableOpacity activeOpacity={0.7} onPress={handleCapture} style={styles.triggerBtn}>
                     <View style={styles.triggerInner} />
@@ -131,23 +130,23 @@ export const CameraBox: React.FC<CameraBoxProps> = ({
           ) : (
             <View style={styles.simulatorContainer}>
               <View style={styles.simulatorHeader}>
-                <Text style={styles.simulatorTitle}>CAMERA HARDWARE SIMULATOR</Text>
+                <Text style={styles.simulatorTitle}>CAMERA PREVIEW</Text>
                 <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
                   <X size={24} color={colors.text.primary} />
                 </TouchableOpacity>
               </View>
               <View style={styles.simulatorBody}>
-                <CameraIcon size={80} color={colors.text.muted} />
+                <CameraIcon size={64} color="#64748B" />
                 <Text style={styles.simulatorMsg}>
                   {permission?.granted === false
-                    ? 'Camera permission denied or camera unavailable.'
-                    : 'System is running inside an Emulator/Simulator.'}
+                    ? 'Camera permission denied.'
+                    : 'Running in Simulator mode.'}
                 </Text>
                 <Text style={styles.simulatorSubMsg}>
-                  San Mines Logistics secure engine will simulate photo verification.
+                  Tap below to attach a sample verification photo.
                 </Text>
                 <TouchableOpacity activeOpacity={0.7} onPress={handleSimulate} style={styles.mockActionBtn}>
-                  <Text style={styles.mockActionText}>Simulate {label} Photo</Text>
+                  <Text style={styles.mockActionText}>Take {label}</Text>
                 </TouchableOpacity>
               </View>
             </View>

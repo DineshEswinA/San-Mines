@@ -36,7 +36,7 @@ export const Button: React.FC<ButtonProps> = ({
     >
       {loading && (
         <ActivityIndicator
-          color={variant === 'outline' ? colors.primary.default : colors.white}
+          color={variant === 'outline' ? '#A5B4FC' : colors.white}
           style={{ marginRight: 10 }}
         />
       )}
@@ -62,12 +62,13 @@ const variantStyles = {
   },
   outline: {
     container: {
-      backgroundColor: colors.transparent,
-      borderWidth: 2,
-      borderColor: colors.primary.default,
-      ...{ shadowOpacity: 0, elevation: 0 },
+      backgroundColor: 'rgba(99, 102, 241, 0.12)',
+      borderWidth: 1.5,
+      borderColor: '#6366F1',
+      shadowOpacity: 0,
+      elevation: 0,
     },
-    text: { color: colors.primary.default },
+    text: { color: '#A5B4FC' },
   },
 };
 

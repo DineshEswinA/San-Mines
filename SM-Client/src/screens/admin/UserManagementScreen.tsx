@@ -197,6 +197,19 @@ export const UserManagementScreen: React.FC = () => {
                 ]}
                 onPress={() => {
                   if (isActive) return;
+
+                  // Validation: Prevent downgrading the last SUPER_ADMIN account in the system
+                  if (item.role === 'SUPER_ADMIN' && r !== 'SUPER_ADMIN') {
+                    const adminCount = users.filter((u) => u.role === 'SUPER_ADMIN').length;
+                    if (adminCount <= 1) {
+                      Alert.alert(
+                        'Action Restricted',
+                        'The system must maintain at least one active Super Admin account. Register or promote another Super Admin before downgrading this user.'
+                      );
+                      return;
+                    }
+                  }
+
                   Alert.alert(
                     'Confirm Privilege Overwrite',
                     `Are you sure you want to alter role permissions for ${item.email} to ${r}?`,

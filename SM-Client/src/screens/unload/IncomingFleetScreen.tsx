@@ -244,7 +244,7 @@ export const IncomingFleetScreen: React.FC = () => {
           setDetailLorry(item);
           setDetailModalVisible(true);
         }}
-        style={{ marginTop: 10, height: 40 }}
+        style={{ marginTop: 10, height: 48 }}
       />
     </View>
   );
@@ -442,7 +442,7 @@ export const IncomingFleetScreen: React.FC = () => {
                 {/* Hardware input: Take Unloading photo */}
                 <View style={styles.cameraContainer}>
                   <CameraBox
-                    label="[Take Unloading Photo]"
+                    label="Unload Photo"
                     photoUri={unloadPhoto}
                     onPhotoCaptured={setUnloadPhoto}
                     onPhotoCleared={() => setUnloadPhoto(undefined)}
