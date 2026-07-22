@@ -393,7 +393,7 @@ export const IncomingFleetScreen: React.FC = () => {
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Quarry Exit Time:</Text>
-                    <Text style={styles.manifestValue}>{formatDateOnly(selectedLorry.exitTime)} {formatTimeTo12Hour(selectedLorry.exitTime)}</Text>
+                    <Text style={styles.manifestValue}>{formatDateOnly(selectedLorry.exitTime)}, {formatTimeTo12Hour(selectedLorry.exitTime)}</Text>
                   </View>
                 </View>
 
@@ -437,7 +437,6 @@ export const IncomingFleetScreen: React.FC = () => {
                   error={errors.unloadingLocation}
                   labelStyle={{ color: '#94A3B8' }}
                 />
-                {errors.unloadingLocation ? <Text style={styles.inlineError}>{errors.unloadingLocation}</Text> : null}
 
                 {/* Hardware input: Take Unloading photo */}
                 <View style={styles.cameraContainer}>
@@ -518,7 +517,7 @@ export const IncomingFleetScreen: React.FC = () => {
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Quarry Exit Time:</Text>
-                    <Text style={styles.manifestValue}>{formatDateOnly(detailLorry.exitTime)} {formatTimeTo12Hour(detailLorry.exitTime)}</Text>
+                    <Text style={styles.manifestValue}>{formatDateOnly(detailLorry.exitTime)}, {formatTimeTo12Hour(detailLorry.exitTime)}</Text>
                   </View>
                 </View>
 

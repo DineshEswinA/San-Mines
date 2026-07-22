@@ -414,7 +414,6 @@ export const QuarryQueueScreen: React.FC = () => {
                   error={errors.location}
                   labelStyle={{ color: '#94A3B8' }}
                 />
-                {errors.location ? <Text style={styles.inlineError}>{errors.location}</Text> : null}
 
                 {/* Exit Time (Editable) */}
                 <DateTimeField
@@ -466,7 +465,6 @@ export const QuarryQueueScreen: React.FC = () => {
                   error={errors.material}
                   labelStyle={{ color: '#94A3B8' }}
                 />
-                {errors.material ? <Text style={styles.inlineError}>{errors.material}</Text> : null}
 
                 {/* Tyre Selector: Horizontal Buttons */}
                 <View style={styles.formGroup}>
