@@ -304,7 +304,7 @@ export const AdminDashboardScreen: React.FC = () => {
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#60A5FA' }]} />
-              <Text style={styles.legendText}>Lorry (Transit)</Text>
+              <Text style={styles.legendText}>Vehicle (Transit)</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />

@@ -18,7 +18,7 @@ interface CheckInScreenProps {
 }
 
 export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
-  const { checkInLorry } = useAuth();
+  const { checkInVehicle } = useAuth();
 
   // Form Fields State
   const [transporterName, setTransporterName] = useState('');
@@ -80,7 +80,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
     setLoading(true);
 
     try {
-      await checkInLorry(transporterName, vehicleNumber, entryDate, entryTime);
+      await checkInVehicle(transporterName, vehicleNumber, entryDate, entryTime);
       Alert.alert(
         'Check-In Successful',
         `Vehicle ${vehicleNumber.toUpperCase()} has been registered in the waiting queue.`,
@@ -111,7 +111,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <ClipboardList size={28} color="#818CF8" />
-            <Text style={styles.cardTitle}>Lorry Check-In Registration</Text>
+            <Text style={styles.cardTitle}>Vehicle Check-In Registration</Text>
           </View>
           <Text style={styles.cardSubtitle}>
             Complete entry logs for incoming transport vehicles entering the quarry loading terminal.
@@ -183,7 +183,7 @@ export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
         <View style={styles.warningContainer}>
           <Text style={styles.warningTitle}>⚠️ OUTDOOR LOGISTICS PROTOCOL</Text>
           <Text style={styles.warningText}>
-            Ensure the lorry number matches the physical license plate exactly. Background GPS monitoring is active.
+            Ensure the vehicle number matches the physical license plate exactly. Background GPS monitoring is active.
           </Text>
         </View>
       </ScrollView>

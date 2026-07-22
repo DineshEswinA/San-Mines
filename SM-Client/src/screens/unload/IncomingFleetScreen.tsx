@@ -56,11 +56,11 @@ export const IncomingFleetScreen: React.FC = () => {
   });
 
   // Verification Form Modal State
-  const [selectedLorry, setSelectedLorry] = useState<QuarryCheckOut | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<QuarryCheckOut | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   // Detail Viewer Modal State
-  const [detailLorry, setDetailLorry] = useState<UnloadVerification | null>(null);
+  const [detailVehicle, setDetailVehicle] = useState<UnloadVerification | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
   // Form Fields
@@ -92,7 +92,7 @@ export const IncomingFleetScreen: React.FC = () => {
       await fetchIncomingFleet();
       await fetchConfigData(true);
     } catch (e) {
-      console.error('Failed to refresh incoming fleet data:', e);
+      console.error('Failed to refresh incoming vehicle data:', e);
     } finally {
       setRefreshing(false);
     }
@@ -105,8 +105,8 @@ export const IncomingFleetScreen: React.FC = () => {
     }
   }, []);
 
-  const handleOpenVerify = (lorry: QuarryCheckOut) => {
-    setSelectedLorry(lorry);
+  const handleOpenVerify = (vehicle: QuarryCheckOut) => {
+    setSelectedVehicle(vehicle);
 
     const now = new Date();
     const year = now.getFullYear();
@@ -128,7 +128,7 @@ export const IncomingFleetScreen: React.FC = () => {
   };
 
   const handleVerifySubmit = async () => {
-    if (!selectedLorry) return;
+    if (!selectedVehicle) return;
     const newErrors: { [key: string]: string } = {};
 
     if (!selectedLocationId) {
@@ -149,7 +149,7 @@ export const IncomingFleetScreen: React.FC = () => {
     setSubmitLoading(true);
 
     try {
-      await verifyAndCloseTrip(selectedLorry.id, {
+      await verifyAndCloseTrip(selectedVehicle.id, {
         unloadDate,
         unloadEntryTime,
         unloadingLocationId: selectedLocationId!,
@@ -157,12 +157,12 @@ export const IncomingFleetScreen: React.FC = () => {
       });
 
       setModalVisible(false);
-      setSelectedLorry(null);
+      setSelectedVehicle(null);
       await reloadData();
 
       Alert.alert(
         'Trip Closed Successfully',
-        `Vehicle ${selectedLorry.vehicleNumber} has been verified and registered to completed archives.`,
+        `Vehicle ${selectedVehicle.vehicleNumber} has been verified and registered to completed archives.`,
         [{ text: 'OK' }]
       );
     } catch (err: any) {
@@ -241,7 +241,7 @@ export const IncomingFleetScreen: React.FC = () => {
         title="View Details"
         variant="outline"
         onPress={() => {
-          setDetailLorry(item);
+          setDetailVehicle(item);
           setDetailModalVisible(true);
         }}
         style={{ marginTop: 10, height: 48 }}
@@ -267,7 +267,7 @@ export const IncomingFleetScreen: React.FC = () => {
       {loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loaderText}>Fetching Transit Cargo...</Text>
+          <Text style={styles.loaderText}>Fetching Transit Vehicles...</Text>
         </View>
       ) : activeSubTab === 'incoming' ? (
         incomingList.length === 0 ? (
@@ -279,7 +279,7 @@ export const IncomingFleetScreen: React.FC = () => {
           >
             <View style={styles.emptyContainer}>
               <Truck size={48} color="#9CA3AF" />
-              <Text style={styles.emptyText}>No Incoming Cargo</Text>
+              <Text style={styles.emptyText}>No Incoming Vehicles</Text>
               <Text style={styles.emptySubtext}>
                 Vehicles dispatched from the Quarry operator terminal will show up here as IN_TRANSIT.
               </Text>
@@ -350,7 +350,7 @@ export const IncomingFleetScreen: React.FC = () => {
       )}
 
       {/* Unloading verification Modal */}
-      {selectedLorry && (
+      {selectedVehicle && (
         <Modal
           animationType="slide"
           transparent={false}
@@ -365,7 +365,7 @@ export const IncomingFleetScreen: React.FC = () => {
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.modalTitle}>Unloading Verification</Text>
-                  <Text style={styles.modalSubtitle}>Trip: {selectedLorry.id} | {selectedLorry.vehicleNumber}</Text>
+                  <Text style={styles.modalSubtitle}>Trip: {selectedVehicle.id} | {selectedVehicle.vehicleNumber}</Text>
                 </View>
                 <TouchableOpacity
                   activeOpacity={0.7}
@@ -375,25 +375,25 @@ export const IncomingFleetScreen: React.FC = () => {
                   <X size={24} color="#F8FAFC" />
                 </TouchableOpacity>
               </View>
-
+ 
               <ScrollView contentContainerStyle={styles.modalScrollContent} keyboardShouldPersistTaps="handled">
                 <View style={styles.manifestCard}>
-                  <Text style={styles.manifestTitle}>CARGO DISPATCH MANIFEST</Text>
+                  <Text style={styles.manifestTitle}>VEHICLE DISPATCH MANIFEST</Text>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Transporter:</Text>
-                    <Text style={styles.manifestValue}>{selectedLorry.transporterName}</Text>
+                    <Text style={styles.manifestValue}>{selectedVehicle.transporterName}</Text>
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Material Type:</Text>
-                    <Text style={styles.manifestValue}>{selectedLorry.material}</Text>
+                    <Text style={styles.manifestValue}>{selectedVehicle.material}</Text>
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Net Weight:</Text>
-                    <Text style={styles.manifestValue}>{selectedLorry.netWeight} Tons</Text>
+                    <Text style={styles.manifestValue}>{selectedVehicle.netWeight} Tons</Text>
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Quarry Exit Time:</Text>
-                    <Text style={styles.manifestValue}>{formatDateOnly(selectedLorry.exitTime)}, {formatTimeTo12Hour(selectedLorry.exitTime)}</Text>
+                    <Text style={styles.manifestValue}>{formatDateOnly(selectedVehicle.exitTime)}, {formatTimeTo12Hour(selectedVehicle.exitTime)}</Text>
                   </View>
                 </View>
 
@@ -474,7 +474,7 @@ export const IncomingFleetScreen: React.FC = () => {
       )}
 
       {/* Detail Viewer Modal */}
-      {detailLorry && (
+      {detailVehicle && (
         <Modal
           animationType="fade"
           transparent={true}
@@ -486,7 +486,7 @@ export const IncomingFleetScreen: React.FC = () => {
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.modalTitle}>Trip Offload Details</Text>
-                  <Text style={styles.modalSubtitle}>Trip ID: {detailLorry.id} | {detailLorry.vehicleNumber}</Text>
+                  <Text style={styles.modalSubtitle}>Trip ID: {detailVehicle.id} | {detailVehicle.vehicleNumber}</Text>
                 </View>
                 <TouchableOpacity
                   activeOpacity={0.7}
@@ -498,43 +498,43 @@ export const IncomingFleetScreen: React.FC = () => {
               </View>
               <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
                 <View style={styles.manifestCard}>
-                  <Text style={styles.manifestTitle}>CARGO DISPATCH MANIFEST</Text>
+                  <Text style={styles.manifestTitle}>VEHICLE DISPATCH MANIFEST</Text>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Transporter:</Text>
-                    <Text style={styles.manifestValue}>{detailLorry.transporterName}</Text>
+                    <Text style={styles.manifestValue}>{detailVehicle.transporterName}</Text>
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Material Type:</Text>
-                    <Text style={styles.manifestValue}>{detailLorry.material}</Text>
+                    <Text style={styles.manifestValue}>{detailVehicle.material}</Text>
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Tyre Configuration:</Text>
-                    <Text style={styles.manifestValue}>{detailLorry.tyres} Wheeler Lorry</Text>
+                    <Text style={styles.manifestValue}>{detailVehicle.tyres} Wheeler Vehicle</Text>
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Net Weight:</Text>
-                    <Text style={styles.manifestValue}>{detailLorry.netWeight} Tons</Text>
+                    <Text style={styles.manifestValue}>{detailVehicle.netWeight} Tons</Text>
                   </View>
                   <View style={styles.manifestRow}>
                     <Text style={styles.manifestLabel}>Quarry Exit Time:</Text>
-                    <Text style={styles.manifestValue}>{formatDateOnly(detailLorry.exitTime)}, {formatTimeTo12Hour(detailLorry.exitTime)}</Text>
+                    <Text style={styles.manifestValue}>{formatDateOnly(detailVehicle.exitTime)}, {formatTimeTo12Hour(detailVehicle.exitTime)}</Text>
                   </View>
                 </View>
-
+ 
                 <View style={styles.summaryBar}>
                   <Text style={[styles.summaryText, { textAlign: 'left', fontWeight: 'bold', marginBottom: 6, color: '#F8FAFC' }]}>
                     UNLOADING LOG
                   </Text>
-                  <Text style={styles.summaryText}>Unloading Location: {detailLorry.unloadingLocation}</Text>
-                  <Text style={styles.summaryText}>Unload Entry Time: {detailLorry.unloadDate} {detailLorry.unloadEntryTime}</Text>
-                  <Text style={styles.summaryText}>Unload Exit Time: {detailLorry.unloadDate} {detailLorry.unloadExitTime}</Text>
+                  <Text style={styles.summaryText}>Unloading Location: {detailVehicle.unloadingLocation}</Text>
+                  <Text style={styles.summaryText}>Unload Entry Time: {detailVehicle.unloadDate}, {detailVehicle.unloadEntryTime}</Text>
+                  <Text style={styles.summaryText}>Unload Exit Time: {detailVehicle.unloadDate}, {detailVehicle.unloadExitTime}</Text>
                 </View>
-
-                {detailLorry.unloadPhoto && (
+ 
+                {detailVehicle.unloadPhoto && (
                   <View style={{ marginTop: 12 }}>
                     <Text style={[styles.detailLabel, { marginBottom: 6 }]}>Security Offload Verification Photo</Text>
                     <View style={styles.detailPhotoContainer}>
-                      <Image source={{ uri: detailLorry.unloadPhoto }} style={styles.detailPhoto} />
+                      <Image source={{ uri: detailVehicle.unloadPhoto }} style={styles.detailPhoto} />
                     </View>
                   </View>
                 )}

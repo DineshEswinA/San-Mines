@@ -62,7 +62,7 @@ export const CameraBox: React.FC<CameraBoxProps> = ({
 
   const handleSimulate = () => {
     let mockUrl = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80';
-    if (label.toLowerCase().includes('lorry') || label.toLowerCase().includes('vehicle')) {
+    if (label.toLowerCase().includes('vehicle')) {
       mockUrl = 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=400&q=80';
     } else if (label.toLowerCase().includes('unload')) {
       mockUrl = 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=400&q=80';

@@ -387,23 +387,23 @@ export const LiveLedgerScreen: React.FC = () => {
                 {/* 3. Photo Captures */}
                 <Text style={styles.sectionTitle}>Security Photograph Logs</Text>
                 <View style={styles.photosGrid}>
-                  {/* Photo 1: Inbound / Lorry Photo */}
+                  {/* Photo 1: Inbound / Vehicle Photo */}
                   <TouchableOpacity
                     style={styles.photoBox}
                     onPress={() => {
-                      if (selectedTrip.lorryPhotoUrl) {
-                        setViewerPhotoUrl(selectedTrip.lorryPhotoUrl);
+                      if (selectedTrip.vehiclePhotoUrl) {
+                        setViewerPhotoUrl(selectedTrip.vehiclePhotoUrl);
                       } else {
-                        Alert.alert('Not Found', 'No Lorry photo uploaded.');
+                        Alert.alert('Not Found', 'No Vehicle photo uploaded.');
                       }
                     }}
                   >
-                    {selectedTrip.lorryPhotoUrl ? (
-                      <Image source={{ uri: selectedTrip.lorryPhotoUrl }} style={styles.thumbnail} />
+                    {selectedTrip.vehiclePhotoUrl ? (
+                      <Image source={{ uri: selectedTrip.vehiclePhotoUrl }} style={styles.thumbnail} />
                     ) : (
                       <View style={styles.emptyPhoto}>
                         <ImageIcon size={24} color="#64748B" />
-                        <Text style={styles.emptyPhotoText}>Lorry Photo</Text>
+                        <Text style={styles.emptyPhotoText}>Vehicle Photo</Text>
                         <Text style={styles.emptyPhotoSub}>Missing</Text>
                       </View>
                     )}

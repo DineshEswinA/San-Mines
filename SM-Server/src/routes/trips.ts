@@ -715,6 +715,8 @@ tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR', 
     userLat,
     userLng,
     quarryExitTime,
+    transitFormPhotoUrl,
+    vehiclePhotoUrl,
   } = req.body;
 
   // Initial validation
@@ -842,6 +844,8 @@ tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR', 
         quarry_gps_lat: null,
         quarry_gps_long: null,
         quarry_exit_time: resolvedExitTime,
+        transit_form_photo_url: transitFormPhotoUrl || null,
+        vehicle_photo_url: vehiclePhotoUrl || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', tripId)
@@ -916,7 +920,7 @@ tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR', 'S
     });
   }
 
-  const { unloadingLocationId, userLat, userLng, unloadEntryTime, unloadExitTime, unloadDate } = req.body;
+  const { unloadingLocationId, userLat, userLng, unloadEntryTime, unloadExitTime, unloadDate, unloadingPhotoUrl } = req.body;
 
   if (!unloadingLocationId) {
     return res.status(400).json({
@@ -1005,6 +1009,7 @@ tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR', 'S
         unload_exit_time: resolvedExitTime,
         unload_date: resolvedUnloadDate,
         unload_operator_id: operatorId,
+        unloading_photo_url: unloadingPhotoUrl || null,
         updated_at: now.toISOString(),
       })
       .eq('id', tripId)

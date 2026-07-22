@@ -507,7 +507,7 @@
                 "checkin"
               ]
             },
-            "description": "Initializes a checkin entry for a lorry. Status becomes 'INSIDE_QUARRY'. Accessible only to QUARRY_OPERATOR. Timestamps fall back to now if empty."
+            "description": "Initializes a checkin entry for a vehicle. Status becomes 'INSIDE_QUARRY'. Accessible only to QUARRY_OPERATOR. Timestamps fall back to now if empty."
           },
           "response": []
         },

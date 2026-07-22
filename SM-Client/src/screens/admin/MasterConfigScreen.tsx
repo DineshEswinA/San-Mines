@@ -385,11 +385,11 @@ export const MasterConfigScreen: React.FC = () => {
         addWheelTypeState(createdObj);
       }
 
-      Alert.alert('Success', `Lorry Class "${newWheelLabel}" appended successfully.`);
+      Alert.alert('Success', `Vehicle Class "${newWheelLabel}" appended successfully.`);
       setNewWheelCount('');
       setNewWheelLabel('');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to add lorry configuration.');
+      Alert.alert('Error', err.message || 'Failed to add vehicle configuration.');
     } finally {
       setLoading(false);
     }
@@ -430,10 +430,10 @@ export const MasterConfigScreen: React.FC = () => {
         updateWheelTypeState(selectedWheelId, updatedObj);
       }
 
-      Alert.alert('Success', `Lorry class updated to "${editWheelLabel}".`);
+      Alert.alert('Success', `Vehicle class updated to "${editWheelLabel}".`);
       setEditWheelModalVisible(false);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update lorry configuration.');
+      Alert.alert('Error', err.message || 'Failed to update vehicle configuration.');
     } finally {
       setLoading(false);
     }
@@ -443,7 +443,7 @@ export const MasterConfigScreen: React.FC = () => {
   const handleDeleteWheel = (wheel: any) => {
     Alert.alert(
       'Confirm Delete',
-      `Are you sure you want to permanently delete configuration "${wheel.wheel_count} Wheeler Lorry"?`,
+      `Are you sure you want to permanently delete configuration "${wheel.wheel_count} Wheeler Vehicle"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -458,7 +458,7 @@ export const MasterConfigScreen: React.FC = () => {
                 return;
               }
               removeWheelTypeState(wheel.id);
-              Alert.alert('Deleted', 'Lorry configuration has been removed successfully.');
+              Alert.alert('Deleted', 'Vehicle configuration has been removed successfully.');
             } catch (err: any) {
               Alert.alert('Deletion Blocked', err.message || 'Could not delete configuration because it is mapped to trips.');
             } finally {
@@ -628,7 +628,7 @@ export const MasterConfigScreen: React.FC = () => {
                     <View style={styles.itemLeft}>
                       <Disc size={20} color="#818CF8" style={{ marginRight: 12 }} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.itemTitle}>{wheel.wheel_count} Wheeler Lorry</Text>
+                        <Text style={styles.itemTitle}>{wheel.wheel_count} Wheeler Vehicle</Text>
                         <Text style={styles.itemDetail}>Identifier: {wheel.display_label}</Text>
                       </View>
                     </View>
@@ -655,7 +655,7 @@ export const MasterConfigScreen: React.FC = () => {
 
               {/* Add New Wheel Form */}
               <View style={styles.formCard}>
-                <Text style={styles.cardFormTitle}>Append New Lorry Class</Text>
+                <Text style={styles.cardFormTitle}>Append New Vehicle Class</Text>
                 <View style={styles.row}>
                   <View style={styles.halfWidth}>
                     <Input
@@ -680,7 +680,7 @@ export const MasterConfigScreen: React.FC = () => {
                   </View>
                 </View>
                 <Button
-                  title="Append Lorry Class"
+                  title="Append Vehicle Class"
                   loadingTitle="Appending..."
                   loading={loading}
                   disabled={loading}
@@ -965,7 +965,7 @@ export const MasterConfigScreen: React.FC = () => {
           >
             <View style={[styles.modalContent, { maxHeight: 420 }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Lorry Class</Text>
+                <Text style={styles.modalTitle}>Edit Vehicle Class</Text>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => setEditWheelModalVisible(false)}

@@ -115,6 +115,8 @@ export const api = {
       userLat: number;
       userLng: number;
       quarryExitTime?: string;
+      transitFormPhotoUrl?: string;
+      vehiclePhotoUrl?: string;
     }
   ): Promise<ApiResponse<any>> => {
     try {
@@ -151,6 +153,7 @@ export const api = {
       unloadEntryTime?: string;
       unloadExitTime?: string;
       unloadDate?: string;
+      unloadingPhotoUrl?: string;
     }
   ): Promise<ApiResponse<any>> => {
     try {

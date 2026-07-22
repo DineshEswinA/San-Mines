@@ -24,7 +24,7 @@ export const QuarryQueueScreen: React.FC = () => {
   const {
     getQuarryQueue,
     fetchQuarryQueue,
-    checkOutLorry,
+    checkOutVehicle,
     materials,
     wheelTypes,
     locations,
@@ -51,7 +51,7 @@ export const QuarryQueueScreen: React.FC = () => {
   });
 
   // Checkout Modal State
-  const [selectedLorry, setSelectedLorry] = useState<QuarryCheckIn | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<QuarryCheckIn | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   // Form Field States for DB config IDs
@@ -70,7 +70,7 @@ export const QuarryQueueScreen: React.FC = () => {
 
   // Camera images
   const [transitFormPhoto, setTransitFormPhoto] = useState<string | undefined>(undefined);
-  const [lorryPhoto, setLorryPhoto] = useState<string | undefined>(undefined);
+  const [vehiclePhoto, setVehiclePhoto] = useState<string | undefined>(undefined);
 
   // GPS coordinates
   const [gpsCoordinates, setGpsCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -156,8 +156,8 @@ export const QuarryQueueScreen: React.FC = () => {
     }
   };
 
-  const handleOpenCheckout = (lorry: QuarryCheckIn) => {
-    setSelectedLorry(lorry);
+  const handleOpenCheckout = (vehicle: QuarryCheckIn) => {
+    setSelectedVehicle(vehicle);
 
     // Auto-fill Exit Time with current local runtime
     const now = new Date();
@@ -183,7 +183,7 @@ export const QuarryQueueScreen: React.FC = () => {
     setNetWeight('');
     setAmount('');
     setTransitFormPhoto(undefined);
-    setLorryPhoto(undefined);
+    setVehiclePhoto(undefined);
     setErrors({});
 
     setModalVisible(true);
@@ -202,7 +202,7 @@ export const QuarryQueueScreen: React.FC = () => {
   };
 
   const handleCheckoutSubmit = async () => {
-    if (!selectedLorry) return;
+    if (!selectedVehicle) return;
 
     const newErrors: { [key: string]: string } = {};
 
@@ -247,7 +247,7 @@ export const QuarryQueueScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      await checkOutLorry(selectedLorry.id, {
+      await checkOutVehicle(selectedVehicle.id, {
         exitTime,
         transitType,
         govtStationaryNumber: transitType === 'DIGITAL' ? govtStationaryNumber.trim() : undefined,
@@ -257,21 +257,21 @@ export const QuarryQueueScreen: React.FC = () => {
         netWeight: Number(netWeight),
         amount: amount.trim() ? Number(cleanAmount) : 0,
         transitFormPhoto,
-        lorryPhoto,
+        vehiclePhoto,
         gpsCoordinates,
       });
 
       setModalVisible(false);
-      setSelectedLorry(null);
+      setSelectedVehicle(null);
       await loadQueue();
 
-      Alert.alert('Dispatch Confirmed', `Vehicle ${selectedLorry.vehicleNumber} dispatched and status changed to IN_TRANSIT.`);
+      Alert.alert('Dispatch Confirmed', `Vehicle ${selectedVehicle.vehicleNumber} dispatched and status changed to IN_TRANSIT.`);
     } catch (err: any) {
       Alert.alert('Checkout Failed', err.message || 'An unexpected error occurred during dispatch.');
     }
   };
 
-  const renderLorryCard = ({ item }: { item: QuarryCheckIn }) => (
+  const renderVehicleCard = ({ item }: { item: QuarryCheckIn }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.badge}>
@@ -308,7 +308,7 @@ export const QuarryQueueScreen: React.FC = () => {
       <View style={styles.boardHeader}>
         <Text style={styles.boardTitle}>Quarry Waiting Yard</Text>
         <View style={styles.counterBadge}>
-          <Text style={styles.counterText}>{filteredQuarryList.length} Lorries Waiting</Text>
+          <Text style={styles.counterText}>{filteredQuarryList.length} Vehicles Waiting</Text>
         </View>
       </View>
 
@@ -354,7 +354,7 @@ export const QuarryQueueScreen: React.FC = () => {
         <FlatList
           data={filteredQuarryList}
           keyExtractor={(item) => item.id}
-          renderItem={renderLorryCard}
+          renderItem={renderVehicleCard}
           contentContainerStyle={styles.listContainer}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
@@ -363,7 +363,7 @@ export const QuarryQueueScreen: React.FC = () => {
       )}
 
       {/* Full Screen Check-Out Modal */}
-      {selectedLorry && (
+      {selectedVehicle && (
         <Modal
           animationType="slide"
           transparent={false}
@@ -377,8 +377,8 @@ export const QuarryQueueScreen: React.FC = () => {
             >
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalTitle}>Dispatch Lorry (Quarry Check-Out)</Text>
-                  <Text style={styles.modalSubtitle}>Dispatching {selectedLorry.vehicleNumber}</Text>
+                  <Text style={styles.modalTitle}>Dispatch Vehicle (Quarry Check-Out)</Text>
+                  <Text style={styles.modalSubtitle}>Dispatching {selectedVehicle.vehicleNumber}</Text>
                 </View>
                 <TouchableOpacity
                   activeOpacity={0.7}
@@ -393,7 +393,7 @@ export const QuarryQueueScreen: React.FC = () => {
                 {/* Vehicle Quick Info */}
                 <View style={styles.summaryBar}>
                   <Text style={styles.summaryText}>
-                    Transporter: <Text style={{ fontWeight: 'bold' }}>{selectedLorry.transporterName}</Text> | In: <Text style={{ fontWeight: 'bold' }}>{formatTimeTo12Hour(selectedLorry.entryTime)}</Text>
+                    Transporter: <Text style={{ fontWeight: 'bold' }}>{selectedVehicle.transporterName}</Text> | In: <Text style={{ fontWeight: 'bold' }}>{formatTimeTo12Hour(selectedVehicle.entryTime)}</Text>
                   </Text>
                 </View>
 
@@ -465,10 +465,10 @@ export const QuarryQueueScreen: React.FC = () => {
                   error={errors.material}
                   labelStyle={{ color: '#94A3B8' }}
                 />
-
+ 
                 {/* Tyre Selector: Horizontal Buttons */}
                 <View style={styles.formGroup}>
-                  <Text style={styles.tyreLabel}>Lorry Tyre Configuration</Text>
+                  <Text style={styles.tyreLabel}>Vehicle Tyre Configuration</Text>
                   <View style={styles.tyreRow}>
                     {wheelTypes.map((wheel) => {
                       const isSelected = selectedWheelTypeId === wheel.id;
@@ -491,7 +491,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   </View>
                   {errors.wheelType ? <Text style={styles.inlineError}>{errors.wheelType}</Text> : null}
                 </View>
-
+ 
                 {/* Net Weight and Amount */}
                 <View style={styles.row}>
                   <View style={styles.halfCol}>
@@ -519,7 +519,7 @@ export const QuarryQueueScreen: React.FC = () => {
                     />
                   </View>
                 </View>
-
+ 
                 {/* Hardware Security: Cameras */}
                 <View style={styles.cameraRow}>
                   <View style={styles.cameraCol}>
@@ -533,15 +533,15 @@ export const QuarryQueueScreen: React.FC = () => {
                   </View>
                   <View style={styles.cameraCol}>
                     <CameraBox
-                      label="Lorry Photo"
-                      photoUri={lorryPhoto}
-                      onPhotoCaptured={setLorryPhoto}
-                      onPhotoCleared={() => setLorryPhoto(undefined)}
+                      label="Vehicle Photo"
+                      photoUri={vehiclePhoto}
+                      onPhotoCaptured={setVehiclePhoto}
+                      onPhotoCleared={() => setVehiclePhoto(undefined)}
                     />
-                    {errors.lorryPhoto ? <Text style={styles.camError}>{errors.lorryPhoto}</Text> : null}
+                    {errors.vehiclePhoto ? <Text style={styles.camError}>{errors.vehiclePhoto}</Text> : null}
                   </View>
                 </View>
-
+ 
                 {/* Hardware Security: GPS lock */}
                 <View style={[styles.gpsReadoutBox, gpsCoordinates ? styles.gpsLocked : styles.gpsLocking]}>
                   <Compass size={20} color={gpsCoordinates ? '#10B981' : '#F59E0B'} style={{ marginRight: 10 }} />
@@ -556,10 +556,10 @@ export const QuarryQueueScreen: React.FC = () => {
                     )}
                   </View>
                 </View>
-
+ 
                 {/* Final dispatch button */}
                 <Button
-                  title="Confirm & Dispatch Lorry"
+                  title="Confirm & Dispatch Vehicle"
                   loadingTitle="Dispatching..."
                   variant="secondary"
                   onPress={handleCheckoutSubmit}
