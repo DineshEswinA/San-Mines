@@ -13,9 +13,10 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CheckInScreen } from './src/screens/quarry/CheckInScreen';
 import { QuarryQueueScreen } from './src/screens/quarry/QuarryQueueScreen';
-import { IncomingFleetScreen } from './src/screens/unload/IncomingFleetScreen';
+import { UnloadNavigator } from './src/navigation/UnloadNavigator';
 import { LoginScreen } from './src/screens/auth/LoginScreen';
-import { SignupScreen } from './src/screens/auth/SignupScreen';
+import { ForgotPasswordScreen } from './src/screens/auth/ForgotPasswordScreen';
+import { ChangePasswordScreen } from './src/screens/auth/ChangePasswordScreen';
 import { User, ClipboardCheck, ListFilter, LogOut } from 'lucide-react-native';
 import { SplashScreen } from './src/screens/Splash/SplashScreen';
 import { AdminNavigator } from './src/navigation/AdminNavigator';
@@ -39,22 +40,10 @@ const BrandLogo: React.FC<{ size?: number }> = ({ size = 26 }) => {
         </RadialGradient>
       </Defs>
 
-      {/* Left triangle */}
-      <Path
-        d="M 46,24 L 28,76 L 54,76 Z"
-        fill="url(#headerLeftGrad)"
-      />
-
-      {/* Right triangle */}
-      <Path
-        d="M 54,24 L 46,76 L 72,76 Z"
-        fill="url(#headerRightGrad)"
-      />
-
-      {/* Glowing Apexes */}
+      <Path d="M 46,24 L 28,76 L 54,76 Z" fill="url(#headerLeftGrad)" />
+      <Path d="M 54,24 L 46,76 L 72,76 Z" fill="url(#headerRightGrad)" />
       <Circle cx={46} cy={24} r={6} fill="url(#headerGlowGrad)" />
       <Circle cx={46} cy={24} r={2} fill="#FFFFFF" />
-
       <Circle cx={54} cy={24} r={6} fill="url(#headerGlowGrad)" />
       <Circle cx={54} cy={24} r={2} fill="#FFFFFF" />
     </Svg>
@@ -62,53 +51,62 @@ const BrandLogo: React.FC<{ size?: number }> = ({ size = 26 }) => {
 };
 
 const MainAppContent: React.FC = () => {
-  const { role, isAuthenticated, logout, isLoading } = useAuth();
+  const { role, isAuthenticated, isPasswordRecovery, logout, isLoading } = useAuth();
+
+  // Auth screen state for unauthenticated users
+  const [authScreen, setAuthScreen] = useState<'login' | 'forgot-password'>('login');
+
+  // Change password overlay for logged-in users
+  const [showChangePassword, setShowChangePassword] = useState(false);
+
+  // Quarry Operator tab: 'checkin' | 'queue'
+  const [quarryTab, setQuarryTab] = useState<'checkin' | 'queue'>('checkin');
 
   const handleLogoutPress = () => {
     Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out of your session?',
+      'Account Options',
+      'Choose an action for your session',
       [
         { text: 'Cancel', style: 'cancel' },
+        { text: 'Change Password', onPress: () => setShowChangePassword(true) },
         { text: 'Log Out', style: 'destructive', onPress: logout },
       ]
     );
   };
 
-  // Quarry Operator active tab: 'checkin' | 'queue'
-  const [quarryTab, setQuarryTab] = useState<'checkin' | 'queue'>('checkin');
-
-  // Authentication mode ('login' | 'signup')
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-
-  // Show splash screen strictly while auth is loading or API requests are resolving
-  const showSplash = isLoading;
-
-  if (showSplash) {
+  if (isLoading) {
     return <SplashScreen />;
   }
 
-  // If not authenticated, render Login/Signup flow
-  if (!isAuthenticated) {
-    return authMode === 'login' ? (
-      <LoginScreen onToggleAuthMode={() => setAuthMode('signup')} />
-    ) : (
-      <SignupScreen onToggleAuthMode={() => setAuthMode('login')} />
+  // Password recovery mode (user arrived via email reset link)
+  if (isPasswordRecovery || showChangePassword) {
+    return (
+      <ChangePasswordScreen
+        isRecoveryFlow={isPasswordRecovery}
+        onClose={() => setShowChangePassword(false)}
+      />
     );
+  }
+
+  // Unauthenticated flows
+  if (!isAuthenticated) {
+    if (authScreen === 'forgot-password') {
+      return <ForgotPasswordScreen onBack={() => setAuthScreen('login')} />;
+    }
+    return <LoginScreen onForgotPassword={() => setAuthScreen('forgot-password')} />;
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
 
-      {/* 1. Top-Bar Header */}
+      {/* Top-Bar Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <BrandLogo size={28} />
           <Text style={[styles.logoText, { marginLeft: 6 }]}>SAN MINES</Text>
         </View>
 
-        {/* User Account Badge & Disconnect Action */}
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleLogoutPress}
@@ -133,30 +131,26 @@ const MainAppContent: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* 3. Screen Hot-swapping & Tab layout depending on current role context */}
+      {/* Main content area */}
       <View style={styles.body}>
         {role === 'QUARRY_OPERATOR' ? (
-          // Quarry Operator flow
           quarryTab === 'checkin' ? (
-            <CheckInScreen onSuccess={() => setQuarryTab('queue')} />
+            <CheckInScreen />
           ) : (
             <QuarryQueueScreen />
           )
         ) : role === 'UNLOAD_OPERATOR' ? (
-          // Unloading Operator flow - Strictly isolated screen context
-          <IncomingFleetScreen />
+          <UnloadNavigator />
         ) : role === 'SUPER_ADMIN' ? (
-          // Super Admin Multi-Tab Mobile Console
           <AdminNavigator />
         ) : (
-          // Fallback welcome screen or error
-          <View style={styles.adminWelcomeContainer}>
-            <Text style={styles.adminWelcomeTitle}>Unknown Privilege Tier</Text>
+          <View style={styles.unknownRoleContainer}>
+            <Text style={styles.unknownRoleText}>Unknown Privilege Tier</Text>
           </View>
         )}
       </View>
 
-      {/* 4. Quarry Operator Bottom-Tab Bar (rendered only for Quarry operator) */}
+      {/* Bottom tab bar — Quarry Operator only */}
       {role === 'QUARRY_OPERATOR' && (
         <View style={styles.bottomTab}>
           <TouchableOpacity
@@ -164,7 +158,7 @@ const MainAppContent: React.FC = () => {
             onPress={() => setQuarryTab('checkin')}
             style={[styles.tabBtn, quarryTab === 'checkin' ? styles.tabBtnActive : null]}
           >
-            <ClipboardCheck size={20} color={quarryTab === 'checkin' ? '#1E40AF' : '#6B7280'} />
+            <ClipboardCheck size={20} color={quarryTab === 'checkin' ? '#818CF8' : '#6B7280'} />
             <Text style={[styles.tabBtnText, quarryTab === 'checkin' ? styles.tabBtnTextActive : null]}>
               Check-In Form
             </Text>
@@ -175,7 +169,7 @@ const MainAppContent: React.FC = () => {
             onPress={() => setQuarryTab('queue')}
             style={[styles.tabBtn, quarryTab === 'queue' ? styles.tabBtnActive : null]}
           >
-            <ListFilter size={20} color={quarryTab === 'queue' ? '#1E40AF' : '#6B7280'} />
+            <ListFilter size={20} color={quarryTab === 'queue' ? '#818CF8' : '#6B7280'} />
             <Text style={[styles.tabBtnText, quarryTab === 'queue' ? styles.tabBtnTextActive : null]}>
               Yard Queue
             </Text>
@@ -199,12 +193,12 @@ export default function App() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#111827', // Pitch dark for top status alignment
+    backgroundColor: '#111827',
     paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
   },
   header: {
     height: 60,
-    backgroundColor: '#1F2937', // Sleek industrial dark grey
+    backgroundColor: '#1F2937',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -232,15 +226,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   profileQuarry: {
-    backgroundColor: '#1E40AF', // Blue background for Quarry User
+    backgroundColor: '#1E40AF',
     borderColor: '#3B82F6',
   },
   profileUnload: {
-    backgroundColor: '#16A34A', // Green background for Unloading User
+    backgroundColor: '#16A34A',
     borderColor: '#4ADE80',
   },
   profileAdmin: {
-    backgroundColor: '#374151', // Dark grey background for Super Admin
+    backgroundColor: '#374151',
     borderColor: '#4B5563',
   },
   profileTriggerText: {
@@ -253,7 +247,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0F172A',
   },
-  // Custom bottom tab layout for Quarry Operator
+  unknownRoleContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#0F172A',
+  },
+  unknownRoleText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#F8FAFC',
+  },
   bottomTab: {
     flexDirection: 'row',
     height: 64,
@@ -284,114 +289,5 @@ const styles = StyleSheet.create({
   },
   tabBtnTextActive: {
     color: '#818CF8',
-  },
-  // Dropdown Modal Styles
-  dropdownOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 70,
-    paddingRight: 16,
-  },
-  dropdownMenu: {
-    width: 250,
-    backgroundColor: '#1E293B',
-    borderRadius: 8,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
-    borderWidth: 1.5,
-    borderColor: '#334155',
-  },
-  dropdownTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#94A3B8',
-    letterSpacing: 1,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  dropdownItemActive: {
-    backgroundColor: '#0F172A',
-  },
-  dropdownItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 10,
-  },
-  dropdownItemText: {
-    fontSize: 14,
-    color: '#F8FAFC',
-    fontWeight: '500',
-  },
-  dropdownDivider: {
-    height: 1,
-    backgroundColor: '#334155',
-    marginVertical: 6,
-  },
-  adminWelcomeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#0F172A',
-  },
-  adminCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 28,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
-    borderWidth: 1.5,
-    borderColor: '#334155',
-  },
-  adminWelcomeTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    marginBottom: 8,
-  },
-  adminWelcomeSub: {
-    fontSize: 14,
-    color: '#94A3B8',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  adminRoleBtn: {
-    width: '100%',
-    height: 48,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  adminRoleBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 15,
   },
 });

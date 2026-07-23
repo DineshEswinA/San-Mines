@@ -55,10 +55,12 @@ export const mapApiToUiMaterial = (apiMaterial: string): string => {
 // Generates dynamic Bearer auth headers reading from the active Supabase token
 const getRequestHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
-  // console.log("access token: ", session?.access_token);
+  if (!session || !session.access_token) {
+    throw new Error('No active session. Please log in.');
+  }
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${session?.access_token || ''}`,
+    'Authorization': `Bearer ${session.access_token}`,
   };
 };
 
@@ -74,11 +76,6 @@ export const api = {
     transporterName: string,
     quarryEntryTime?: string
   ): Promise<ApiResponse<any>> => {
-    console.log({
-      vehicleNumber: vehicleNumber.trim().toUpperCase(),
-      transporterName: transporterName.trim(),
-      quarryEntryTime
-    });
     try {
       const headers = await getRequestHeaders();
       const response = await fetch(`${API_BASE_URL}/api/trips/checkin`, {

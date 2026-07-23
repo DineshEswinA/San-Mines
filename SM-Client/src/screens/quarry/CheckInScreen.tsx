@@ -13,11 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ClipboardList } from 'lucide-react-native';
 import { Input, DateTimeField, Button } from '../../components/ui';
 
-interface CheckInScreenProps {
-  onSuccess: () => void; // Callback to switch tab to the Queue board
-}
-
-export const CheckInScreen: React.FC<CheckInScreenProps> = ({ onSuccess }) => {
+export const CheckInScreen: React.FC = () => {
   const { checkInVehicle } = useAuth();
 
   // Form Fields State

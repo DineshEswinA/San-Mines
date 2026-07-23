@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useAuth, QuarryCheckIn, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
+import { haversineDistance } from '../../utils/geo';
 
 import { Truck, Compass, CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
 import { Button, Input, SegmentedControl, PickerField, DateTimeField, SearchBar, CameraBox } from '../../components/ui';
@@ -76,6 +77,7 @@ export const QuarryQueueScreen: React.FC = () => {
   const [gpsCoordinates, setGpsCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsStatusText, setGpsStatusText] = useState('Acquiring Lock...');
+  const [geofenceStatus, setGeofenceStatus] = useState<'unknown' | 'inside' | 'outside'>('unknown');
 
   // Validation errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -83,13 +85,12 @@ export const QuarryQueueScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Reload queue from context
   const loadQueue = async () => {
     setLoading(true);
     try {
       await fetchQuarryQueue();
     } catch (err: any) {
-      // In case role changes, safety boundary will throw. Handle gracefully.
+      Alert.alert('Load Failed', err.message || 'Failed to load the quarry queue. Pull down to retry.');
     } finally {
       setLoading(false);
     }
@@ -100,8 +101,8 @@ export const QuarryQueueScreen: React.FC = () => {
     try {
       await fetchQuarryQueue();
       await fetchConfigData(true);
-    } catch (err) {
-      console.error('Failed to refresh quarry queue:', err);
+    } catch {
+      // pull-to-refresh failure is visible via empty list; no alert needed
     } finally {
       setRefreshing(false);
     }
@@ -115,42 +116,52 @@ export const QuarryQueueScreen: React.FC = () => {
     }
   }, []);
 
-  // Request GPS lock on checkout trigger
   const acquireGpsLock = async (locationId?: number | null) => {
     setGpsLoading(true);
-    setGpsStatusText('Requesting Device APIs...');
+    setGpsCoordinates(null);
+    setGeofenceStatus('unknown');
+    setGpsStatusText('Requesting location permission...');
+
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
 
-      // If a location is selected, use its coordinates as fallback/mock to pass geofence
-      const targetLoc = locations.find(l => l.id === (locationId || selectedLocationId));
-      const fallbackLat = targetLoc ? Number(targetLoc.latitude) : 13.082700;
-      const fallbackLng = targetLoc ? Number(targetLoc.longitude) : 80.270700;
-
       if (status !== 'granted') {
-        setGpsCoordinates({ latitude: fallbackLat, longitude: fallbackLng });
-        setGpsStatusText('📍 GPS Lat/Long Locked via Location API (Simulated)');
+        setGpsStatusText('Location access denied. GPS permission is required to dispatch.');
         setGpsLoading(false);
         return;
       }
 
-      setGpsStatusText('Querying satellites...');
-      const location = await Location.getCurrentPositionAsync({
+      setGpsStatusText('Acquiring satellite lock...');
+      const result = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
 
-      // To pass geofencing reliably, set coordinates to the chosen quarry location's exact coords
-      setGpsCoordinates({
-        latitude: fallbackLat,
-        longitude: fallbackLng,
-      });
-      setGpsStatusText('📍 GPS Lat/Long Locked via Device API (Active Satellite)');
-    } catch (err) {
-      const targetLoc = locations.find(l => l.id === (locationId || selectedLocationId));
-      const fallbackLat = targetLoc ? Number(targetLoc.latitude) : 13.082700;
-      const fallbackLng = targetLoc ? Number(targetLoc.longitude) : 80.270700;
-      setGpsCoordinates({ latitude: fallbackLat, longitude: fallbackLng });
-      setGpsStatusText('📍 GPS Lat/Long Locked via Device API (Simulated Fallback)');
+      const { latitude, longitude } = result.coords;
+      setGpsCoordinates({ latitude, longitude });
+
+      // Check against selected quarry location boundary
+      const resolvedId = locationId ?? selectedLocationId;
+      const targetLoc = locations.find(l => Number(l.id) === Number(resolvedId));
+
+      if (targetLoc) {
+        const distanceMeters = haversineDistance(
+          latitude, longitude,
+          Number(targetLoc.latitude), Number(targetLoc.longitude)
+        );
+        const allowedRadius = Number(targetLoc.allowed_radius_meters) || 500;
+
+        if (distanceMeters <= allowedRadius) {
+          setGeofenceStatus('inside');
+          setGpsStatusText(`📍 GPS Locked — Inside Quarry Boundary (${Math.round(distanceMeters)}m from centre)`);
+        } else {
+          setGeofenceStatus('outside');
+          setGpsStatusText(`⚠️ Outside Quarry Boundary — ${Math.round(distanceMeters)}m from site centre`);
+        }
+      } else {
+        setGpsStatusText('📍 GPS Locked via Device API');
+      }
+    } catch {
+      setGpsStatusText('Failed to acquire GPS lock. Please try again before dispatching.');
     } finally {
       setGpsLoading(false);
     }
@@ -185,6 +196,9 @@ export const QuarryQueueScreen: React.FC = () => {
     setTransitFormPhoto(undefined);
     setVehiclePhoto(undefined);
     setErrors({});
+    setGeofenceStatus('unknown');
+    setGpsCoordinates(null);
+    setGpsStatusText('Acquiring Lock...');
 
     setModalVisible(true);
     acquireGpsLock(null);
@@ -208,6 +222,10 @@ export const QuarryQueueScreen: React.FC = () => {
 
     if (!selectedLocationId) {
       newErrors.location = 'Dispatch Quarry Location is required';
+    }
+
+    if (!gpsCoordinates) {
+      newErrors.gps = 'GPS lock is required. Enable location access and wait for lock before dispatching.';
     }
 
     if (transitType === 'DIGITAL') {
@@ -543,19 +561,51 @@ export const QuarryQueueScreen: React.FC = () => {
                 </View>
  
                 {/* Hardware Security: GPS lock */}
-                <View style={[styles.gpsReadoutBox, gpsCoordinates ? styles.gpsLocked : styles.gpsLocking]}>
-                  <Compass size={20} color={gpsCoordinates ? '#10B981' : '#F59E0B'} style={{ marginRight: 10 }} />
+                <View style={[
+                  styles.gpsReadoutBox,
+                  gpsCoordinates
+                    ? (geofenceStatus === 'outside' ? styles.gpsOutside : styles.gpsLocked)
+                    : styles.gpsLocking,
+                ]}>
+                  <Compass
+                    size={20}
+                    color={gpsCoordinates ? (geofenceStatus === 'outside' ? '#F59E0B' : '#10B981') : '#64748B'}
+                    style={{ marginRight: 10 }}
+                  />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.gpsReadoutText, gpsCoordinates ? styles.gpsTextLocked : styles.gpsTextLocking]}>
+                    <Text style={[
+                      styles.gpsReadoutText,
+                      gpsCoordinates
+                        ? (geofenceStatus === 'outside' ? styles.gpsTextOutside : styles.gpsTextLocked)
+                        : styles.gpsTextLocking,
+                    ]}>
                       {gpsStatusText}
                     </Text>
                     {gpsCoordinates && (
-                      <Text style={styles.gpsCoordinatesDetail}>
+                      <Text style={[
+                        styles.gpsCoordinatesDetail,
+                        geofenceStatus === 'outside' ? { color: '#FCD34D' } : null,
+                      ]}>
                         {gpsCoordinates.latitude.toFixed(6)}° N, {gpsCoordinates.longitude.toFixed(6)}° E
                       </Text>
                     )}
                   </View>
                 </View>
+
+                {/* Geofence violation warning banner */}
+                {geofenceStatus === 'outside' && (
+                  <View style={styles.geofenceWarningBanner}>
+                    <AlertTriangle size={16} color="#EF4444" style={{ marginRight: 8 }} />
+                    <Text style={styles.geofenceWarningText}>
+                      Trip flagged: dispatch location is outside the authorised quarry boundary. The server will validate and may reject this dispatch.
+                    </Text>
+                  </View>
+                )}
+
+                {/* GPS error if coordinates not acquired before submit */}
+                {errors.gps ? (
+                  <Text style={styles.inlineError}>{errors.gps}</Text>
+                ) : null}
  
                 {/* Final dispatch button */}
                 <Button
@@ -858,28 +908,52 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   gpsLocking: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: '#D97706',
+    backgroundColor: 'rgba(100, 116, 139, 0.1)',
+    borderColor: '#475569',
   },
   gpsLocked: {
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderColor: '#10B981',
+  },
+  gpsOutside: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: '#D97706',
   },
   gpsReadoutText: {
     fontSize: 13,
     fontWeight: 'bold',
   },
   gpsTextLocking: {
-    color: '#F59E0B',
+    color: '#94A3B8',
   },
   gpsTextLocked: {
     color: '#34D399',
+  },
+  gpsTextOutside: {
+    color: '#FCD34D',
   },
   gpsCoordinatesDetail: {
     fontSize: 11,
     color: '#34D399',
     marginTop: 2,
     fontWeight: '600',
+  },
+  geofenceWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: '#DC2626',
+    borderWidth: 1.5,
+    borderRadius: 6,
+    padding: 10,
+    marginTop: -8,
+    marginBottom: 8,
+  },
+  geofenceWarningText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#FCA5A5',
+    lineHeight: 17,
   },
   dispatchBtn: {
     height: 54, // Large high-contrast touch target

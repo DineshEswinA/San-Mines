@@ -9,38 +9,24 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui';
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  Phone,
-  ArrowRight,
-  ShieldAlert,
-  ShieldCheck,
-} from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react-native';
 
 interface LoginScreenProps {
-  onToggleAuthMode: () => void;
+  onForgotPassword: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onForgotPassword }) => {
   const { login } = useAuth();
 
-  // Input states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberSession, setRememberSession] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // Error states
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const handleLogin = async () => {
@@ -79,14 +65,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
     }
   };
 
-  const handleOAuthClick = (provider: string) => {
-    Alert.alert('Simulated OAuth', `${provider} OAuth integration triggered.`);
-  };
-
-  const handleForgotPassword = () => {
-    Alert.alert('Reset Password', 'Password reset instructions sent to your email.');
-  };
-
   return (
     <SafeAreaView style={styles.safeContainer}>
       <KeyboardAvoidingView
@@ -111,37 +89,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
             </Text>
           </View>
 
-          {/* Social OAuth Buttons */}
-          <View style={styles.oauthContainer}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => handleOAuthClick('Google')}
-              style={styles.oauthBtn}
-            >
-              {/* Fake Google Logo colors using layout */}
-              <View style={styles.fakeGoogleLogo}>
-                <Text style={styles.googleG}>G</Text>
-              </View>
-              <Text style={styles.oauthBtnText}>Continue with Google</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => handleOAuthClick('Phone')}
-              style={styles.oauthBtn}
-            >
-              <Phone size={18} color="#1F2937" style={{ marginRight: 8 }} />
-              <Text style={styles.oauthBtnText}>Login with Phone Number</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR EMAIL LOGIN</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           {/* Form */}
           <View style={styles.form}>
             {/* Email Address */}
@@ -151,7 +98,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
                 <Mail size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="operator@logitrack.pro"
+                  placeholder="operator@sanmines.in"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -170,7 +117,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
             <View style={styles.formGroup}>
               <View style={styles.passwordLabelRow}>
                 <Text style={styles.label}>SECURITY PASSWORD</Text>
-                <TouchableOpacity activeOpacity={0.7} onPress={handleForgotPassword}>
+                <TouchableOpacity activeOpacity={0.7} onPress={onForgotPassword}>
                   <Text style={styles.forgotPasswordLink}>Forgot Password?</Text>
                 </TouchableOpacity>
               </View>
@@ -202,18 +149,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
               {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
             </View>
 
-            {/* Remember terminal checkbox */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setRememberSession(!rememberSession)}
-              style={styles.checkboxRow}
-            >
-              <View style={[styles.checkbox, rememberSession ? styles.checkboxChecked : null]}>
-                {rememberSession && <View style={styles.checkboxInner} />}
-              </View>
-              <Text style={styles.checkboxLabel}>Remember this terminal session</Text>
-            </TouchableOpacity>
-
             {/* Enter Dashboard Button */}
             <Button
               title="Enter Dashboard"
@@ -224,14 +159,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
               loading={loading}
               style={styles.submitBtn}
             />
-
-            {/* Sign up toggle link */}
-            <View style={styles.signupToggleRow}>
-              <Text style={styles.toggleText}>Don't have an account? </Text>
-              <TouchableOpacity activeOpacity={0.7} onPress={onToggleAuthMode}>
-                <Text style={styles.toggleLink}>Sign up</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* End-to-end encrypted security banner */}
@@ -246,10 +173,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onToggleAuthMode }) =>
             </View>
           </View>
 
-          {/* Footer system details */}
+          {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              LOGITRACK ENTERPRISE SYSTEMS © 2024 • BUILD V2.4.0-STABLE
+              SAN MINES LOGISTICS © 2026 • QUARRY OPERATIONS PORTAL
             </Text>
           </View>
         </ScrollView>
@@ -272,16 +199,13 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: 40,
     alignItems: 'flex-start',
   },
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
-  },
-  logoIcon: {
-    marginRight: 10,
   },
   logoText: {
     fontSize: 22,
@@ -298,59 +222,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#94A3B8',
     lineHeight: 20,
-  },
-  oauthContainer: {
-    width: '100%',
-    marginBottom: 24,
-  },
-  oauthBtn: {
-    height: 52,
-    borderWidth: 1.5,
-    borderColor: '#334155',
-    borderRadius: 8,
-    backgroundColor: '#1E293B',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  fakeGoogleLogo: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  googleG: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#EF4444',
-  },
-  oauthBtnText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#F8FAFC',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 12,
-    marginBottom: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#334155',
-  },
-  dividerText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    marginHorizontal: 16,
-    letterSpacing: 1.5,
   },
   form: {
     width: '100%',
@@ -407,68 +278,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 6,
   },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-    paddingVertical: 4,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 1.5,
-    borderColor: '#334155',
-    borderRadius: 4,
-    marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0F172A',
-  },
-  checkboxChecked: {
-    borderColor: '#6366F1',
-    backgroundColor: '#6366F1',
-  },
-  checkboxInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    color: '#94A3B8',
-  },
   submitBtn: {
     height: 54,
-    backgroundColor: '#6366F1',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    elevation: 3,
-  },
-  submitBtnText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  signupToggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 16,
-  },
-  toggleText: {
-    fontSize: 14,
-    color: '#94A3B8',
-  },
-  toggleLink: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#818CF8',
+    marginTop: 8,
   },
   encryptedBanner: {
     flexDirection: 'row',
@@ -478,7 +290,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: 8,
     padding: 16,
-    marginTop: 24,
+    marginTop: 32,
   },
   encryptedTitle: {
     fontSize: 12,
@@ -499,7 +311,7 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 9,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: '#64748B',
     letterSpacing: 0.5,
   },
 });
