@@ -375,10 +375,6 @@ const styles = StyleSheet.create({
   bgSlate800: {
     backgroundColor: '#1E293B',
   },
-  breachCard: {
-    backgroundColor: '#1E293B',
-    borderColor: '#EF4444', // High-visibility red border
-  },
   completedCard: {
     backgroundColor: '#1E293B',
     borderColor: '#10B981', // Safety/Completed Green border
@@ -406,9 +402,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
     fontWeight: '600',
-  },
-  textRed: {
-    color: '#F87171',
   },
   textGreen: {
     color: '#10B981',

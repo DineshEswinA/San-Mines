@@ -187,11 +187,6 @@ const styles = StyleSheet.create({
     color: colors.primary.light,
     marginTop: 6,
   },
-  subCaptureText: {
-    fontSize: 11,
-    color: colors.text.muted,
-    marginTop: 2,
-  },
   previewContainer: {
     height: 120,
     borderRadius: radius.md,

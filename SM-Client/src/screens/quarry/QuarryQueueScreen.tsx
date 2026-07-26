@@ -632,41 +632,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
     padding: 16,
   },
-  filterSection: {
-    backgroundColor: '#1E293B',
-    borderWidth: 1.5,
-    borderColor: '#334155',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  searchBar: {
-    marginBottom: 8,
-  },
-  timeFilterRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  timePickerCol: {
-    flex: 1,
-    marginRight: 8,
-  },
-  clearBtn: {
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#EF4444',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  clearBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-    textTransform: 'uppercase',
-  },
   boardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -1052,10 +1052,6 @@ const styles = StyleSheet.create({
   subTabTextActive: {
     color: '#F8FAFC',
   },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
   scrollContentWithForm: {
     padding: 16,
     paddingBottom: 220,
