@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
+import { BUILD_CONFIG } from '../../config/version';
 import { RefreshCw, Truck, MapPin, AlertOctagon, ShieldAlert, Navigation, ShieldCheck } from 'lucide-react-native';
 import Svg, { Circle, Line, Rect, G, Text as SvgText } from 'react-native-svg';
 
@@ -313,6 +314,13 @@ export const AdminDashboardScreen: React.FC = () => {
           </View>
         </View>
       </View>
+
+      {/* Version Footer */}
+      <View style={styles.versionContainer}>
+        <Text style={styles.versionText}>
+          Version {BUILD_CONFIG.version} (Build {BUILD_CONFIG.buildNumber}) • {BUILD_CONFIG.buildDate}
+        </Text>
+      </View>
     </ScrollView>
   );
 };
@@ -464,5 +472,20 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 11,
     fontWeight: '600',
+  },
+  versionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 32,
+    paddingTop: 16,
+    borderTopWidth: 1.5,
+    borderTopColor: '#1E293B',
+  },
+  versionText: {
+    color: '#475569', // Muted slate gray
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
 });
