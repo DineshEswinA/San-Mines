@@ -27,31 +27,6 @@ let API_BASE_URL = __DEV__
 //   }
 // }
 
-// Bridge UI Material Names to PostgreSQL Enum Value Names
-export const mapUiToApiMaterial = (material: string): string => {
-  switch (material) {
-    case 'Crushed Stone (10mm)': return '10mm_road_metal';
-    case 'Crushed Stone (20mm)': return '20mm_road_metal';
-    case 'River Sand': return 'river_sand';
-    case 'Granite Dust': return 'msand';
-    case 'Gravel': return 'rough_gravel';
-    case 'Black Soil': return 'pure_gravel';
-    default: return 'river_sand';
-  }
-};
-
-export const mapApiToUiMaterial = (apiMaterial: string): string => {
-  switch (apiMaterial) {
-    case '10mm_road_metal': return 'Crushed Stone (10mm)';
-    case '20mm_road_metal': return 'Crushed Stone (20mm)';
-    case 'river_sand': return 'River Sand';
-    case 'msand': return 'Granite Dust';
-    case 'rough_gravel': return 'Gravel';
-    case 'pure_gravel': return 'Black Soil';
-    default: return 'River Sand';
-  }
-};
-
 // Generates dynamic Bearer auth headers reading from the active Supabase token
 const getRequestHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();

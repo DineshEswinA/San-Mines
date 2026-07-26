@@ -15,7 +15,3 @@ export function formatDateOnly(epoch: number | string | Date): string {
   if (isNaN(date.getTime())) return '';
   return date.toISOString().split('T')[0];
 }
-
-export function formatDateTime(epoch: number | string | Date): string {
-  return `${formatDateOnly(epoch)}, ${formatTimeTo12Hour(epoch)}`;
-}

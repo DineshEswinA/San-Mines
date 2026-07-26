@@ -18,13 +18,3 @@ export function haversineDistance(
 
   return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
-export function isOutsideGeofence(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number,
-  allowedRadiusMeters: number,
-): boolean {
-  return haversineDistance(lat1, lon1, lat2, lon2) > allowedRadiusMeters;
-}
