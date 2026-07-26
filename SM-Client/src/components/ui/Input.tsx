@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, TextInput, StyleSheet, ViewStyle, TextInputProps, TextStyle } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, StyleSheet, ViewStyle, TextInputProps, TextStyle, TouchableOpacity } from 'react-native';
 import { colors, radius, spacing, touchTarget } from '../../theme';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 interface InputProps extends TextInputProps {
   label: string;
@@ -19,8 +20,11 @@ export const Input: React.FC<InputProps> = ({
   isAlphanumeric = false,
   onChangeText,
   labelStyle,
+  secureTextEntry,
   ...rest
 }) => {
+  const [showPassword, setShowPassword] = useState(false);
+
   const handleTextChange = (text: string) => {
     if (isAlphanumeric) {
       const filtered = text.replace(/[^a-zA-Z0-9-]/g, '');
@@ -29,6 +33,8 @@ export const Input: React.FC<InputProps> = ({
       onChangeText?.(text);
     }
   };
+
+  const isPassword = secureTextEntry !== undefined;
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -42,12 +48,28 @@ export const Input: React.FC<InputProps> = ({
           )}
         </Text>
       </View>
-      <TextInput
-        style={[styles.textInput, error ? styles.textInputError : null]}
-        placeholderTextColor={colors.text.muted}
-        onChangeText={handleTextChange}
-        {...rest}
-      />
+      <View style={[styles.inputWrapper, error ? styles.inputWrapperError : null]}>
+        <TextInput
+          style={styles.textInput}
+          placeholderTextColor={colors.text.muted}
+          onChangeText={handleTextChange}
+          secureTextEntry={isPassword ? !showPassword : false}
+          {...rest}
+        />
+        {isPassword && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowPassword(!showPassword)}
+            style={styles.eyeBtn}
+          >
+            {showPassword ? (
+              <EyeOff size={20} color={colors.text.secondary} />
+            ) : (
+              <Eye size={20} color={colors.text.secondary} />
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
@@ -80,18 +102,30 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     fontWeight: '400',
   },
-  textInput: {
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     height: touchTarget,
     borderWidth: 1.5,
     borderColor: colors.border.default,
     borderRadius: radius.md,
+    backgroundColor: colors.bg.surface,
+  },
+  inputWrapperError: {
+    borderColor: colors.border.error,
+  },
+  textInput: {
+    flex: 1,
+    height: '100%',
     paddingHorizontal: spacing.md,
     fontSize: 16,
     color: colors.text.primary,
-    backgroundColor: colors.bg.surface,
   },
-  textInputError: {
-    borderColor: colors.border.error,
+  eyeBtn: {
+    paddingHorizontal: spacing.md,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   errorText: {
     color: colors.danger.light,
@@ -100,3 +134,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+

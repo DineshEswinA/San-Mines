@@ -14,11 +14,11 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { User, Shield, Check, RefreshCw, UserPlus, X } from 'lucide-react-native';
+import { User, Check, RefreshCw, UserPlus, X } from 'lucide-react-native';
 import { Input, PickerField, Button } from '../../components/ui';
 
 export const UserManagementScreen: React.FC = () => {
-  const { role: currentUserRole, logout } = useAuth();
+  const { role: currentUserRole } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [mutatingUserId, setMutatingUserId] = useState<string | null>(null);
@@ -280,30 +280,6 @@ export const UserManagementScreen: React.FC = () => {
         />
       )}
 
-      {/* Crimson Secure Disconnect Console Button (Absolute Bottom) */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            Alert.alert(
-              'Secure Disconnect Console',
-              'This will destroy the local operational session and log you out. Proceed?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Disconnect',
-                  style: 'destructive',
-                  onPress: logout,
-                },
-              ]
-            );
-          }}
-          style={styles.disconnectBtn}
-        >
-          <Shield size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-          <Text style={styles.disconnectBtnText}>Secure Disconnect Console</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Floating Action Button */}
       <TouchableOpacity
@@ -474,7 +450,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
-    paddingBottom: 100, // Clearance for absolute footer
+    paddingBottom: 16,
   },
   card: {
     backgroundColor: '#1E293B',
@@ -602,31 +578,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
-    backgroundColor: '#0F172A',
-    borderTopWidth: 1.5,
-    borderTopColor: '#1E293B',
-  },
-  disconnectBtn: {
-    width: '100%',
-    height: 48, // Minimum 48px touch target height
-    borderRadius: 8,
-    backgroundColor: '#EF4444',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-  },
-  disconnectBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 14,
   },
   fab: {
     position: 'absolute',

@@ -149,9 +149,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onForgotPassword }) =>
               {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
             </View>
 
-            {/* Enter Dashboard Button */}
             <Button
-              title="Enter Dashboard"
+              title="Sign In"
               loadingTitle="Signing in..."
               variant="primary"
               onPress={handleLogin}
