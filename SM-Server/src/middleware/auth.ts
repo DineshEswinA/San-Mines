@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase';
 
 // Augment Express Request interface globally to attach user info to requests cleanly
@@ -32,49 +31,18 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const token = authHeader.split(' ')[1];
 
-  // Local offline mock tokens for testing and verification
-  if (token === 'mock-quarry-operator') {
-    req.user = {
-      id: 'c0000000-0000-0000-0000-000000000001',
-      email: 'quarry@sammines.com',
-      role: 'QUARRY_OPERATOR',
-    };
-    return next();
-  }
-
-  if (token === 'mock-unload-operator') {
-    req.user = {
-      id: 'c0000000-0000-0000-0000-000000000002',
-      email: 'unload@sammines.com',
-      role: 'UNLOAD_OPERATOR',
-    };
-    return next();
-  }
-
   try {
-    const secret = process.env.SUPABASE_JWT_SECRET || 'your-supabase-jwt-secret';
-    let decoded: any;
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
-    try {
-      decoded = jwt.verify(token, secret);
-    } catch (verifyError) {
-      // Fallback: decode without signature verification if in development mode or if secret isn't set
-      if (process.env.NODE_ENV === 'development' || !process.env.SUPABASE_JWT_SECRET) {
-        decoded = jwt.decode(token);
-        if (!decoded) {
-          throw new Error('Invalid JWT token format and signature could not be verified.');
-        }
-      } else {
-        throw verifyError;
-      }
-    }
-
-    if (!decoded || typeof decoded === 'string') {
+    if (userError || !user) {
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid or expired access token.',
+        details: userError?.message,
       });
     }
+
+    const decoded = user;
 
     // Resolve user role prioritizing app_metadata role claims, falling back to general role
     let role =
@@ -85,22 +53,26 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     // If role resolves to default 'authenticated', query profiles table for custom role
     if (role === 'authenticated') {
-      try {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', decoded.sub || decoded.id)
-          .single();
-        if (profileData && profileData.role) {
-          role = profileData.role;
-        }
-      } catch (err) {
-        console.error('Error fetching role from profiles table:', err);
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', decoded.id)
+        .single();
+
+      if (profileError) {
+        return res.status(503).json({
+          error: 'Service Unavailable',
+          message: 'Unable to verify user role. Please retry in a moment.',
+        });
+      }
+
+      if (profileData?.role) {
+        role = profileData.role;
       }
     }
 
     req.user = {
-      id: decoded.sub || decoded.id,
+      id: decoded.id,
       email: decoded.email,
       role
       // ...decoded,

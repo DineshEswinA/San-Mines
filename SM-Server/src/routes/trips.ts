@@ -715,6 +715,8 @@ tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR', 
     userLat,
     userLng,
     quarryExitTime,
+    transitFormPhotoUrl,
+    vehiclePhotoUrl,
   } = req.body;
 
   // Initial validation
@@ -734,11 +736,11 @@ tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR', 
       });
     }
 
-    const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(govtStationaryNumber);
+    const isAlphanumeric = /^[A-Z0-9\-\/ ]{4,50}$/i.test(govtStationaryNumber);
     if (!isAlphanumeric) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'govtStationaryNumber must be strictly alphanumeric.',
+        message: 'govtStationaryNumber must be 4–50 characters and may only contain letters, digits, hyphens, slashes, and spaces.',
       });
     }
   }
@@ -814,16 +816,16 @@ tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR', 
       });
     }
 
-    // RULE 2: Geofence check using Haversine Formula (DISABLED)
-    // const distance = getDistance(userLat, userLng, parseFloat(location.latitude), parseFloat(location.longitude));
-    // const allowedRadius = parseFloat(location.allowed_radius_meters || '100');
-    //
-    // if (distance > allowedRadius) {
-    //   return res.status(403).json({
-    //     error: 'Forbidden',
-    //     message: `Geofence violation: Distance from quarry is ${distance.toFixed(2)}m, which exceeds the allowed radius of ${allowedRadius}m.`,
-    //   });
-    // }
+    // RULE 2: Geofence check using Haversine Formula
+    const distance = getDistance(userLat, userLng, parseFloat(location.latitude), parseFloat(location.longitude));
+    const allowedRadius = parseFloat(location.allowed_radius_meters || '100');
+
+    if (distance > allowedRadius) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: `Geofence violation: Distance from quarry is ${distance.toFixed(2)}m, which exceeds the allowed radius of ${allowedRadius}m.`,
+      });
+    }
 
     const resolvedExitTime = combineDateTimeToIso(quarryExitTime, null, new Date());
 
@@ -839,9 +841,11 @@ tripsRouter.put('/checkout/:id', requireAuth, authorizeRole(['QUARRY_OPERATOR', 
         wheel_type_id: wheelTypeId,
         net_weight_tonne: netWeightTonne,
         amount_entry: amountEntry !== undefined ? amountEntry : null,
-        quarry_gps_lat: null,
-        quarry_gps_long: null,
+        quarry_gps_lat: userLat,
+        quarry_gps_long: userLng,
         quarry_exit_time: resolvedExitTime,
+        transit_form_photo_url: transitFormPhotoUrl || null,
+        vehicle_photo_url: vehiclePhotoUrl || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', tripId)
@@ -916,7 +920,7 @@ tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR', 'S
     });
   }
 
-  const { unloadingLocationId, userLat, userLng, unloadEntryTime, unloadExitTime, unloadDate } = req.body;
+  const { unloadingLocationId, userLat, userLng, unloadEntryTime, unloadExitTime, unloadDate, unloadingPhotoUrl } = req.body;
 
   if (!unloadingLocationId) {
     return res.status(400).json({
@@ -975,16 +979,16 @@ tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR', 'S
       });
     }
 
-    // RULE 1 (Geofence check): Run Haversine check (DISABLED)
-    // const distance = getDistance(userLat, userLng, parseFloat(location.latitude), parseFloat(location.longitude));
-    // const allowedRadius = parseFloat(location.allowed_radius_meters || '100');
-    //
-    // if (distance > allowedRadius) {
-    //   return res.status(403).json({
-    //     error: 'Forbidden',
-    //     message: `Geofence violation: Distance from unloading site is ${distance.toFixed(2)}m, which exceeds the allowed radius of ${allowedRadius}m.`,
-    //   });
-    // }
+    // RULE 1 (Geofence check): Run Haversine check
+    const distance = getDistance(userLat, userLng, parseFloat(location.latitude), parseFloat(location.longitude));
+    const allowedRadius = parseFloat(location.allowed_radius_meters || '100');
+
+    if (distance > allowedRadius) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: `Geofence violation: Distance from unloading site is ${distance.toFixed(2)}m, which exceeds the allowed radius of ${allowedRadius}m.`,
+      });
+    }
 
     const now = new Date();
     const resolvedUnloadDate = resolveDateOnly(unloadDate, now);
@@ -999,12 +1003,13 @@ tripsRouter.put('/unload/:id', requireAuth, authorizeRole(['UNLOAD_OPERATOR', 'S
       .update({
         status: 'UNLOADED',
         unloading_location_id: unloadingLocationId,
-        unload_gps_lat: null,
-        unload_gps_long: null,
+        unload_gps_lat: userLat,
+        unload_gps_long: userLng,
         unload_entry_time: resolvedEntryTime,
         unload_exit_time: resolvedExitTime,
         unload_date: resolvedUnloadDate,
         unload_operator_id: operatorId,
+        unloading_photo_url: unloadingPhotoUrl || null,
         updated_at: now.toISOString(),
       })
       .eq('id', tripId)
@@ -1051,7 +1056,8 @@ tripsRouter.get('/', requireAuth, async (req: Request, res: Response) => {
       query = query.in('status', ['IN_TRANSIT', 'UNLOADED']);
     }
 
-    const { data, error, count } = await query.order('created_at', { ascending: false });
+    const orderField = status === 'UNLOADED' ? 'updated_at' : 'created_at';
+    const { data, error, count } = await query.order(orderField, { ascending: false });
 
     if (error) {
       return res.status(500).json({

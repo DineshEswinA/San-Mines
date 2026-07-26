@@ -77,7 +77,7 @@ CREATE TABLE public.trips (
     net_weight_tonne NUMERIC(6, 2), 
     amount_entry NUMERIC(10, 2), 
     transit_form_photo_url TEXT,
-    lorry_photo_url TEXT,
+    vehicle_photo_url TEXT,
     quarry_gps_lat NUMERIC(9, 6),
     quarry_gps_long NUMERIC(9, 6),
     

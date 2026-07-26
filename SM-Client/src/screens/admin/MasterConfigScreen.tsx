@@ -15,9 +15,9 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { Input, PickerField } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
+
 import { MapPin, Plus, Layers, Disc, Trash2, Edit2, X } from 'lucide-react-native';
+import { Input, PickerField, Button } from '../../components/ui';
 
 export const MasterConfigScreen: React.FC = () => {
   const {
@@ -385,11 +385,11 @@ export const MasterConfigScreen: React.FC = () => {
         addWheelTypeState(createdObj);
       }
 
-      Alert.alert('Success', `Lorry Class "${newWheelLabel}" appended successfully.`);
+      Alert.alert('Success', `Vehicle Class "${newWheelLabel}" appended successfully.`);
       setNewWheelCount('');
       setNewWheelLabel('');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to add lorry configuration.');
+      Alert.alert('Error', err.message || 'Failed to add vehicle configuration.');
     } finally {
       setLoading(false);
     }
@@ -430,10 +430,10 @@ export const MasterConfigScreen: React.FC = () => {
         updateWheelTypeState(selectedWheelId, updatedObj);
       }
 
-      Alert.alert('Success', `Lorry class updated to "${editWheelLabel}".`);
+      Alert.alert('Success', `Vehicle class updated to "${editWheelLabel}".`);
       setEditWheelModalVisible(false);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update lorry configuration.');
+      Alert.alert('Error', err.message || 'Failed to update vehicle configuration.');
     } finally {
       setLoading(false);
     }
@@ -443,7 +443,7 @@ export const MasterConfigScreen: React.FC = () => {
   const handleDeleteWheel = (wheel: any) => {
     Alert.alert(
       'Confirm Delete',
-      `Are you sure you want to permanently delete configuration "${wheel.wheel_count} Wheeler Lorry"?`,
+      `Are you sure you want to permanently delete configuration "${wheel.wheel_count} Wheeler Vehicle"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -458,7 +458,7 @@ export const MasterConfigScreen: React.FC = () => {
                 return;
               }
               removeWheelTypeState(wheel.id);
-              Alert.alert('Deleted', 'Lorry configuration has been removed successfully.');
+              Alert.alert('Deleted', 'Vehicle configuration has been removed successfully.');
             } catch (err: any) {
               Alert.alert('Deletion Blocked', err.message || 'Could not delete configuration because it is mapped to trips.');
             } finally {
@@ -521,7 +521,7 @@ export const MasterConfigScreen: React.FC = () => {
         >
           {/* PANEL 1: LOCATIONS */}
           <View style={{ width: screenWidth }}>
-            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={styles.scrollContentWithFab} keyboardShouldPersistTaps="handled">
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Active Yards Registry</Text>
                 <Text style={styles.sectionSubtitle}>Locations where GPS checks are run</Text>
@@ -559,7 +559,7 @@ export const MasterConfigScreen: React.FC = () => {
 
           {/* PANEL 2: MATERIALS */}
           <View style={{ width: screenWidth }}>
-            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={styles.scrollContentWithForm} keyboardShouldPersistTaps="handled">
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Ecosystem Materials Registry</Text>
                 <Text style={styles.sectionSubtitle}>Material chips loaded on outbound lorries</Text>
@@ -616,7 +616,7 @@ export const MasterConfigScreen: React.FC = () => {
 
           {/* PANEL 3: WHEELS */}
           <View style={{ width: screenWidth }}>
-            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={styles.scrollContentWithForm} keyboardShouldPersistTaps="handled">
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Vehicle Classes Registry</Text>
                 <Text style={styles.sectionSubtitle}>Activate, deactivate or customize wheel count configurations</Text>
@@ -628,7 +628,7 @@ export const MasterConfigScreen: React.FC = () => {
                     <View style={styles.itemLeft}>
                       <Disc size={20} color="#818CF8" style={{ marginRight: 12 }} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.itemTitle}>{wheel.wheel_count} Wheeler Lorry</Text>
+                        <Text style={styles.itemTitle}>{wheel.wheel_count} Wheeler Vehicle</Text>
                         <Text style={styles.itemDetail}>Identifier: {wheel.display_label}</Text>
                       </View>
                     </View>
@@ -655,7 +655,7 @@ export const MasterConfigScreen: React.FC = () => {
 
               {/* Add New Wheel Form */}
               <View style={styles.formCard}>
-                <Text style={styles.cardFormTitle}>Append New Lorry Class</Text>
+                <Text style={styles.cardFormTitle}>Append New Vehicle Class</Text>
                 <View style={styles.row}>
                   <View style={styles.halfWidth}>
                     <Input
@@ -680,7 +680,7 @@ export const MasterConfigScreen: React.FC = () => {
                   </View>
                 </View>
                 <Button
-                  title="Append Lorry Class"
+                  title="Append Vehicle Class"
                   loadingTitle="Appending..."
                   loading={loading}
                   disabled={loading}
@@ -909,8 +909,11 @@ export const MasterConfigScreen: React.FC = () => {
           visible={editMatModalVisible}
           onRequestClose={() => setEditMatModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxHeight: 320 }]}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={[styles.modalContent, { maxHeight: 360 }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Edit Material Type</Text>
                 <TouchableOpacity
@@ -922,7 +925,11 @@ export const MasterConfigScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.modalBody}>
+              <ScrollView
+                style={{ flexGrow: 0, flexShrink: 1 }}
+                contentContainerStyle={styles.modalBody}
+                keyboardShouldPersistTaps="handled"
+              >
                 <Input
                   label="Material Display Name"
                   placeholder="e.g. Granite Chips (40mm)"
@@ -940,9 +947,9 @@ export const MasterConfigScreen: React.FC = () => {
                   onPress={handleEditMaterialSubmit}
                   style={styles.submitBtn}
                 />
-              </View>
+              </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Modal: Edit Wheel Type */}
@@ -952,10 +959,13 @@ export const MasterConfigScreen: React.FC = () => {
           visible={editWheelModalVisible}
           onRequestClose={() => setEditWheelModalVisible(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxHeight: 380 }]}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={[styles.modalContent, { maxHeight: 420 }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Lorry Class</Text>
+                <Text style={styles.modalTitle}>Edit Vehicle Class</Text>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => setEditWheelModalVisible(false)}
@@ -965,7 +975,11 @@ export const MasterConfigScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.modalBody}>
+              <ScrollView
+                style={{ flexGrow: 0, flexShrink: 1 }}
+                contentContainerStyle={styles.modalBody}
+                keyboardShouldPersistTaps="handled"
+              >
                 <View style={styles.row}>
                   <View style={styles.halfWidth}>
                     <Input
@@ -998,9 +1012,9 @@ export const MasterConfigScreen: React.FC = () => {
                   onPress={handleEditWheelSubmit}
                   style={styles.submitBtn}
                 />
-              </View>
+              </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </View>
     </KeyboardAvoidingView>
@@ -1038,9 +1052,13 @@ const styles = StyleSheet.create({
   subTabTextActive: {
     color: '#F8FAFC',
   },
-  scrollContent: {
+  scrollContentWithForm: {
     padding: 16,
-    paddingBottom: 260,
+    paddingBottom: 220,
+  },
+  scrollContentWithFab: {
+    padding: 16,
+    paddingBottom: 88,
   },
   sectionHeader: {
     marginBottom: 20,

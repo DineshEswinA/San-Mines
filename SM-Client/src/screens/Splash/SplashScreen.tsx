@@ -181,11 +181,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 2,
   },
-  loaderPercent: {
-    color: '#818CF8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
   track: {
     height: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',

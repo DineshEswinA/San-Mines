@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useAuth, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
 import { api } from '../../lib/api';
-import { SearchBar } from '../../components/ui/SearchBar';
+import { SearchBar } from '../../components/ui';
 import { Truck, X, Clock, Calendar, ShieldCheck, ShieldAlert, User, Image as ImageIcon } from 'lucide-react-native';
 
 // Helper function to calculate distance using Haversine formula
@@ -387,23 +387,23 @@ export const LiveLedgerScreen: React.FC = () => {
                 {/* 3. Photo Captures */}
                 <Text style={styles.sectionTitle}>Security Photograph Logs</Text>
                 <View style={styles.photosGrid}>
-                  {/* Photo 1: Inbound / Lorry Photo */}
+                  {/* Photo 1: Inbound / Vehicle Photo */}
                   <TouchableOpacity
                     style={styles.photoBox}
                     onPress={() => {
-                      if (selectedTrip.lorryPhotoUrl) {
-                        setViewerPhotoUrl(selectedTrip.lorryPhotoUrl);
+                      if (selectedTrip.vehiclePhotoUrl) {
+                        setViewerPhotoUrl(selectedTrip.vehiclePhotoUrl);
                       } else {
-                        Alert.alert('Not Found', 'No Lorry photo uploaded.');
+                        Alert.alert('Not Found', 'No Vehicle photo uploaded.');
                       }
                     }}
                   >
-                    {selectedTrip.lorryPhotoUrl ? (
-                      <Image source={{ uri: selectedTrip.lorryPhotoUrl }} style={styles.thumbnail} />
+                    {selectedTrip.vehiclePhotoUrl ? (
+                      <Image source={{ uri: selectedTrip.vehiclePhotoUrl }} style={styles.thumbnail} />
                     ) : (
                       <View style={styles.emptyPhoto}>
                         <ImageIcon size={24} color="#64748B" />
-                        <Text style={styles.emptyPhotoText}>Lorry Photo</Text>
+                        <Text style={styles.emptyPhotoText}>Vehicle Photo</Text>
                         <Text style={styles.emptyPhotoSub}>Missing</Text>
                       </View>
                     )}

@@ -5,7 +5,6 @@ import Constants from 'expo-constants';
 // Declare global React Native __DEV__ variable for TypeScript compiler if needed
 declare const __DEV__: boolean;
 
-console.log("EXPO_PUBLIC_API_URL - " + process.env.EXPO_PUBLIC_API_URL);
 let API_BASE_URL = __DEV__
   ? (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000')
   : 'https://san-mines.vercel.app';
@@ -28,38 +27,15 @@ let API_BASE_URL = __DEV__
 //   }
 // }
 
-// Bridge UI Material Names to PostgreSQL Enum Value Names
-export const mapUiToApiMaterial = (material: string): string => {
-  switch (material) {
-    case 'Crushed Stone (10mm)': return '10mm_road_metal';
-    case 'Crushed Stone (20mm)': return '20mm_road_metal';
-    case 'River Sand': return 'river_sand';
-    case 'Granite Dust': return 'msand';
-    case 'Gravel': return 'rough_gravel';
-    case 'Black Soil': return 'pure_gravel';
-    default: return 'river_sand';
-  }
-};
-
-export const mapApiToUiMaterial = (apiMaterial: string): string => {
-  switch (apiMaterial) {
-    case '10mm_road_metal': return 'Crushed Stone (10mm)';
-    case '20mm_road_metal': return 'Crushed Stone (20mm)';
-    case 'river_sand': return 'River Sand';
-    case 'msand': return 'Granite Dust';
-    case 'rough_gravel': return 'Gravel';
-    case 'pure_gravel': return 'Black Soil';
-    default: return 'River Sand';
-  }
-};
-
 // Generates dynamic Bearer auth headers reading from the active Supabase token
 const getRequestHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
-  // console.log("access token: ", session?.access_token);
+  if (!session || !session.access_token) {
+    throw new Error('No active session. Please log in.');
+  }
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${session?.access_token || ''}`,
+    'Authorization': `Bearer ${session.access_token}`,
   };
 };
 
@@ -75,11 +51,6 @@ export const api = {
     transporterName: string,
     quarryEntryTime?: string
   ): Promise<ApiResponse<any>> => {
-    console.log({
-      vehicleNumber: vehicleNumber.trim().toUpperCase(),
-      transporterName: transporterName.trim(),
-      quarryEntryTime
-    });
     try {
       const headers = await getRequestHeaders();
       const response = await fetch(`${API_BASE_URL}/api/trips/checkin`, {
@@ -116,6 +87,8 @@ export const api = {
       userLat: number;
       userLng: number;
       quarryExitTime?: string;
+      transitFormPhotoUrl?: string;
+      vehiclePhotoUrl?: string;
     }
   ): Promise<ApiResponse<any>> => {
     try {
@@ -152,6 +125,7 @@ export const api = {
       unloadEntryTime?: string;
       unloadExitTime?: string;
       unloadDate?: string;
+      unloadingPhotoUrl?: string;
     }
   ): Promise<ApiResponse<any>> => {
     try {

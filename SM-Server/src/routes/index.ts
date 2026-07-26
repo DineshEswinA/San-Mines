@@ -3,6 +3,7 @@ import { getDistance } from '../utils/geo';
 import { requireAuth, authorizeRole } from '../middleware/auth';
 import { tripsRouter, configRouter } from './trips';
 import { supabase } from '../config/supabase';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -22,6 +23,7 @@ router.get('/users', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Re
       .order('created_at', { ascending: false });
 
     if (error) {
+      logger.error(`[GET /api/users] Database error: ${error.message}`);
       return res.status(500).json({
         error: 'Database Error',
         message: 'Failed to retrieve user profiles.',
@@ -31,6 +33,7 @@ router.get('/users', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: Re
 
     return res.json(profiles);
   } catch (err: any) {
+    logger.error(`[GET /api/users] Unexpected error: ${err.message}`);
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'An unexpected error occurred while fetching profiles.',
@@ -71,27 +74,33 @@ router.post('/users', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: R
     });
 
     if (authError || !authData.user) {
+      logger.error(`[POST /api/users] Auth creation error: ${authError?.message}`);
       return res.status(500).json({
         error: 'Authentication Error',
-        message: 'Failed to create auth credentials.',
+        message: authError?.message || 'Failed to create auth credentials.',
         details: authError?.message,
       });
     }
 
-    // 2. Create the profile row in the public.profiles table
+    // 2. Create or update the profile row in the public.profiles table using upsert
+    // (Upsert prevents failures if a DB trigger on_auth_user_created already created the profile row)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .insert({
-        id: authData.user.id,
-        email: email.trim(),
-        role: role,
-        full_name: full_name.trim(),
-      })
+      .upsert(
+        {
+          id: authData.user.id,
+          email: email.trim(),
+          role: role,
+          full_name: full_name.trim(),
+        },
+        { onConflict: 'id' }
+      )
       .select()
       .single();
 
     if (profileError) {
-      // Clean up created auth user if profile insert fails to prevent orphaned auth accounts
+      logger.error(`[POST /api/users] Profile upsert error: ${profileError.message}`);
+      // Clean up created auth user if profile upsert fails to prevent orphaned auth accounts
       await supabase.auth.admin.deleteUser(authData.user.id);
       
       return res.status(500).json({
@@ -101,6 +110,7 @@ router.post('/users', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: R
       });
     }
 
+    logger.info(`[POST /api/users] User created successfully: ${email.trim()} (${role})`);
     return res.status(201).json({
       message: 'User created successfully.',
       user: {
@@ -111,6 +121,7 @@ router.post('/users', requireAuth, authorizeRole(['SUPER_ADMIN']), async (req: R
       },
     });
   } catch (err: any) {
+    logger.error(`[POST /api/users] Unexpected error: ${err.message}`);
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to complete user registration.',
@@ -135,7 +146,45 @@ router.patch('/users/:id/role', requireAuth, authorizeRole(['SUPER_ADMIN']), asy
   }
 
   try {
-    // 1. Update the profile role in the profiles table
+    // 1. Fetch current profile of the target user
+    const { data: targetProfile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !targetProfile) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'User profile not found in database.',
+      });
+    }
+
+    // 2. Prevent downgrading the last SUPER_ADMIN user in the system
+    if (targetProfile.role === 'SUPER_ADMIN' && role !== 'SUPER_ADMIN') {
+      const { count, error: countError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'SUPER_ADMIN');
+
+      if (countError) {
+        logger.error(`[PATCH /api/users/${id}/role] Error counting admins: ${countError.message}`);
+        return res.status(500).json({
+          error: 'Database Error',
+          message: 'Failed to verify active administrator count.',
+        });
+      }
+
+      if (count !== null && count <= 1) {
+        logger.warn(`[PATCH /api/users/${id}/role] Blocked downgrade of last SUPER_ADMIN user (${id})`);
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Cannot downgrade role. System must maintain at least one active Super Admin account.',
+        });
+      }
+    }
+
+    // 3. Update the profile role in the profiles table
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .update({ role })
@@ -144,6 +193,7 @@ router.patch('/users/:id/role', requireAuth, authorizeRole(['SUPER_ADMIN']), asy
       .single();
 
     if (profileError) {
+      logger.error(`[PATCH /api/users/${id}/role] Profile update error: ${profileError.message}`);
       return res.status(500).json({
         error: 'Database Error',
         message: 'Failed to update user profile role in the database.',
@@ -151,21 +201,23 @@ router.patch('/users/:id/role', requireAuth, authorizeRole(['SUPER_ADMIN']), asy
       });
     }
 
-    // 2. Also update auth user metadata & app metadata so that the JWT reflects it
+    // 4. Also update auth user metadata & app metadata so that the JWT reflects it
     const { error: authError } = await supabase.auth.admin.updateUserById(id as string, {
       app_metadata: { role },
       user_metadata: { role }
     });
 
     if (authError) {
-      console.error('Error updating auth metadata for user:', authError);
+      logger.error(`[PATCH /api/users/${id}/role] Error updating auth metadata: ${authError.message}`);
     }
 
+    logger.info(`[PATCH /api/users/${id}/role] Successfully updated user role to ${role}`);
     return res.json({
       message: `Successfully updated user role to ${role}`,
       profile,
     });
   } catch (err: any) {
+    logger.error(`[PATCH /api/users/${id}/role] Unexpected error: ${err.message}`);
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'An unexpected error occurred during user role update.',

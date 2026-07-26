@@ -2,6 +2,18 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { formatTimeTo12Hour, formatDateOnly } from '../utils/format';
+
+// Changes each time the JS bundle loads (i.e., each cold app start).
+// Used to invalidate the config cache between launches without an explicit clear.
+const CURRENT_SESSION_ID = String(Date.now());
+const CONFIG_SESSION_KEY = 'config_session_id';
+const CONFIG_MATERIALS_KEY = 'config_materials';
+const CONFIG_WHEEL_TYPES_KEY = 'config_wheel_types';
+const CONFIG_LOCATIONS_KEY = 'config_locations';
+
+// Re-export so existing screens that import from AuthContext keep working
+export { formatTimeTo12Hour, formatDateOnly } from '../utils/format';
 
 export type Role = 'QUARRY_OPERATOR' | 'UNLOAD_OPERATOR' | 'SUPER_ADMIN';
 
@@ -21,8 +33,8 @@ export interface QuarryCheckOut extends Omit<QuarryCheckIn, 'status'> {
   tyres: number;
   netWeight: number;
   amount: number;
-  transitFormPhoto?: string;
-  lorryPhoto?: string;
+  transitFormPhoto: string | null;
+  vehiclePhoto: string | null;
   gpsCoordinates: {
     latitude: number;
     longitude: number;
@@ -30,31 +42,12 @@ export interface QuarryCheckOut extends Omit<QuarryCheckIn, 'status'> {
   status: 'IN_TRANSIT' | 'UNLOADED';
 }
 
-export const formatTimeTo12Hour = (epoch: number | string | Date): string => {
-  if (!epoch) return '';
-  const date = new Date(epoch);
-  if (isNaN(date.getTime())) return '';
-  let hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12;
-  hours = hours ? hours : 12; // the hour '0' should be '12'
-  return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
-};
-
-export const formatDateOnly = (epoch: number | string | Date): string => {
-  if (!epoch) return '';
-  const date = new Date(epoch);
-  if (isNaN(date.getTime())) return '';
-  return date.toISOString().split('T')[0];
-};
-
 export interface UnloadVerification extends Omit<QuarryCheckOut, 'status'> {
   unloadDate: string;
   unloadEntryTime: string;
   unloadingLocation: string;
   unloadExitTime: string;
-  unloadPhoto?: string;
+  unloadPhoto: string | null;
   status: 'UNLOADED';
 }
 
@@ -64,14 +57,16 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isPasswordRecovery: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (fullName: string, email: string, password: string) => Promise<{ error: string | null }>;
+  forgotPassword: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
   logout: () => Promise<{ error: string | null }>;
   // Quarry Operator specific data (Throws error if accessed by Unloading Operator)
   getQuarryQueue: () => QuarryCheckIn[];
   fetchQuarryQueue: () => Promise<void>;
-  checkInLorry: (transporterName: string, vehicleNumber: string, date: string, time: string) => Promise<void>;
-  checkOutLorry: (
+  checkInVehicle: (transporterName: string, vehicleNumber: string, date: string, time: string) => Promise<void>;
+  checkOutVehicle: (
     id: string,
     checkOutData: {
       exitTime: string;
@@ -83,7 +78,7 @@ interface AuthContextType {
       netWeight: number;
       amount: number;
       transitFormPhoto?: string;
-      lorryPhoto?: string;
+      vehiclePhoto?: string;
       gpsCoordinates: {
         latitude: number;
         longitude: number;
@@ -93,7 +88,8 @@ interface AuthContextType {
 
   // Unload Operator specific data (Throws error if accessed by Quarry Operator)
   getIncomingFleet: () => QuarryCheckOut[];
-  fetchIncomingFleet: () => Promise<void>;
+  fetchTransitFleet: () => Promise<void>;
+  fetchCompletedArchives: () => Promise<void>;
   verifyAndCloseTrip: (
     id: string,
     verificationData: {
@@ -135,6 +131,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   // Keep separate state arrays for strict data isolation
   const [quarryQueue, setQuarryQueue] = useState<QuarryCheckIn[]>([]);
@@ -178,18 +175,55 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const fetchConfigData = async (force: boolean = false) => {
-    // Avoid making 3 redundant network requests if config is already cached in memory
     if (!force && materials.length > 0 && wheelTypes.length > 0 && locations.length > 0) {
       return;
     }
+
+    // Try to hydrate from this session's AsyncStorage cache before hitting the network
+    if (!force) {
+      try {
+        const sessionId = await AsyncStorage.getItem(CONFIG_SESSION_KEY);
+        if (sessionId === CURRENT_SESSION_ID) {
+          const [mData, wData, lData] = await Promise.all([
+            AsyncStorage.getItem(CONFIG_MATERIALS_KEY),
+            AsyncStorage.getItem(CONFIG_WHEEL_TYPES_KEY),
+            AsyncStorage.getItem(CONFIG_LOCATIONS_KEY),
+          ]);
+          if (mData && wData && lData) {
+            setMaterials(JSON.parse(mData));
+            setWheelTypes(JSON.parse(wData));
+            setLocations(JSON.parse(lData));
+            return;
+          }
+        }
+      } catch (e) {
+        // Cache miss — fall through to network fetch
+      }
+    }
+
     const [mRes, wRes, lRes] = await Promise.all([
       api.getMaterials(),
       api.getWheelTypes(),
       api.getLocations(),
     ]);
-    if (mRes.data) setMaterials(mRes.data);
-    if (wRes.data) setWheelTypes(wRes.data);
-    if (lRes.data) setLocations(lRes.data);
+
+    const newMaterials = mRes.data ?? [];
+    const newWheelTypes = wRes.data ?? [];
+    const newLocations = lRes.data ?? [];
+
+    if (mRes.data) setMaterials(newMaterials);
+    if (wRes.data) setWheelTypes(newWheelTypes);
+    if (lRes.data) setLocations(newLocations);
+
+    // Persist to session cache so subsequent screen navigations skip the network
+    try {
+      await AsyncStorage.setItem(CONFIG_SESSION_KEY, CURRENT_SESSION_ID);
+      if (mRes.data) await AsyncStorage.setItem(CONFIG_MATERIALS_KEY, JSON.stringify(newMaterials));
+      if (wRes.data) await AsyncStorage.setItem(CONFIG_WHEEL_TYPES_KEY, JSON.stringify(newWheelTypes));
+      if (lRes.data) await AsyncStorage.setItem(CONFIG_LOCATIONS_KEY, JSON.stringify(newLocations));
+    } catch (e) {
+      // Non-critical — caching failure doesn't block the app
+    }
   };
 
   // Monitor session changes with active Supabase listener
@@ -282,8 +316,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (active) setIsLoading(false);
     });
 
-    // Listen for authentication changes (login, logout, refresh token)
+    // Listen for authentication changes (login, logout, refresh token, password recovery)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
+        setIsAuthenticated(true);
+        setIsLoading(false);
+        return;
+      }
+      if (_event === 'USER_UPDATED') {
+        setIsPasswordRecovery(false);
+      }
       initializeUser(session);
     });
 
@@ -317,45 +360,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return { error: error ? error.message : null };
   };
 
-  const signUp = async (fullName: string, email: string, password: string) => {
+  const forgotPassword = async (email: string): Promise<{ error: string | null }> => {
     if (!isConfigured()) {
-      return {
-        error: 'Supabase credentials are not configured. Please create a .env file in the root of the project and set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to your database details.',
-      };
+      return { error: 'Supabase credentials are not configured.' };
     }
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: {
-          full_name: fullName.trim(),
-        },
-      },
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: 'sanmines://change-password',
     });
+    return { error: error ? error.message : null };
+  };
 
-    if (!error && data?.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: data.user.id,
-          email: email.trim(),
-          role: 'QUARRY_OPERATOR',
-          full_name: fullName.trim(),
-        });
-      if (profileError) {
-        return { error: `Auth succeeded, but profile creation failed: ${profileError.message}` };
-      }
+  const updatePassword = async (newPassword: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (!error) {
+      setIsPasswordRecovery(false);
     }
-
     return { error: error ? error.message : null };
   };
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('user_role');
+      await AsyncStorage.multiRemove([
+        'user_role',
+        CONFIG_SESSION_KEY,
+        CONFIG_MATERIALS_KEY,
+        CONFIG_WHEEL_TYPES_KEY,
+        CONFIG_LOCATIONS_KEY,
+      ]);
     } catch (err) {
-      console.error('Failed to clear role on logout:', err);
+      console.error('Failed to clear storage on logout:', err);
     }
+    setMaterials([]);
+    setWheelTypes([]);
+    setLocations([]);
+    setQuarryQueue([]);
+    setTransitFleet([]);
+    setCompletedArchives([]);
     setIsSuperAdmin(false);
     const { error } = await supabase.auth.signOut();
     return { error: error ? error.message : null };
@@ -410,75 +450,77 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const fetchIncomingFleet = async () => {
+  const extractTimePart = (isoStr: string | null): string => {
+    if (!isoStr) return '';
+    const date = new Date(isoStr);
+    if (isNaN(date.getTime())) return '';
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const mapTripBase = (trip: any) => {
+    const mat = materials.find(m => Number(m.id) === Number(trip.materialId));
+    const wheel = wheelTypes.find(w => Number(w.id) === Number(trip.wheelTypeId));
+    return {
+      id: String(trip.id),
+      transporterName: trip.transporterName,
+      vehicleNumber: trip.vehicleNumber,
+      entryTime: Number(trip.quarryEntryTime),
+      exitTime: Number(trip.quarryExitTime),
+      transitType: trip.transitType,
+      govtStationaryNumber: trip.govtStationaryNumber || '',
+      material: mat ? mat.display_name : `Material #${trip.materialId}`,
+      tyres: wheel ? wheel.wheel_count : 10,
+      netWeight: Number(trip.netWeightTonne || 0),
+      amount: Number(trip.amountEntry || 0),
+      gpsCoordinates: trip.quarryGpsLat
+        ? { latitude: Number(trip.quarryGpsLat), longitude: Number(trip.quarryGpsLong) }
+        : null,
+      transitFormPhoto: trip.transitFormPhotoUrl || null,
+      vehiclePhoto: trip.vehiclePhotoUrl || null,
+    };
+  };
+
+  const fetchTransitFleet = async () => {
     assertUnloadAccess();
     if (materials.length === 0 || wheelTypes.length === 0 || locations.length === 0) {
       await fetchConfigData();
     }
-    const res = await api.getTrips();
-    if (res.error) {
-      throw new Error(res.error);
-    }
+    const res = await api.getTrips('IN_TRANSIT');
+    if (res.error) throw new Error(res.error);
     if (res.data && res.data.trips) {
-      const activeTransit: QuarryCheckOut[] = [];
-      const completed: UnloadVerification[] = [];
-
-      const extractTimePart = (isoStr: string | null): string => {
-        if (!isoStr) return '';
-        const date = new Date(isoStr);
-        if (isNaN(date.getTime())) return '';
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        return `${hours}:${minutes}`;
-      };
-
-      res.data.trips.forEach((trip: any) => {
-        const mat = materials.find(m => Number(m.id) === Number(trip.materialId));
-        const materialDisplayName = mat ? mat.display_name : `Material #${trip.materialId}`;
-
-        const wheel = wheelTypes.find(w => Number(w.id) === Number(trip.wheelTypeId));
-        const tyreCount = wheel ? wheel.wheel_count : 10;
-
-        const mappedTrip = {
-          id: String(trip.id),
-          transporterName: trip.transporterName,
-          vehicleNumber: trip.vehicleNumber,
-          entryTime: Number(trip.quarryEntryTime),
-          exitTime: Number(trip.quarryExitTime),
-          transitType: trip.transitType,
-          govtStationaryNumber: trip.govtStationaryNumber || '',
-          material: materialDisplayName,
-          tyres: tyreCount,
-          netWeight: Number(trip.netWeightTonne || 0),
-          amount: Number(trip.amountEntry || 0),
-          gpsCoordinates: trip.quarryGpsLat ? { latitude: Number(trip.quarryGpsLat), longitude: Number(trip.quarryGpsLong) } : null,
-          status: trip.status || 'IN_TRANSIT',
-        };
-
-        if (trip.status === 'UNLOADED') {
-          const loc = locations.find(l => Number(l.id) === Number(trip.unloadingLocationId));
-          const unloadLocationName = loc ? loc.name : `Unload Site #${trip.unloadingLocationId}`;
-
-          completed.push({
-            ...mappedTrip,
-            unloadDate: formatDateOnly(trip.unloadDate || trip.unloadEntryTime),
-            unloadEntryTime: extractTimePart(trip.unloadEntryTime),
-            unloadingLocation: unloadLocationName,
-            unloadExitTime: extractTimePart(trip.unloadExitTime),
-            unloadPhoto: trip.unloadingPhotoUrl,
-            status: 'UNLOADED',
-          });
-        } else if (trip.status === 'IN_TRANSIT') {
-          activeTransit.push(mappedTrip);
-        }
-      });
-
-      setTransitFleet(activeTransit);
-      setCompletedArchives(completed);
+      const mapped: QuarryCheckOut[] = res.data.trips.map((trip: any) => ({
+        ...mapTripBase(trip),
+        status: 'IN_TRANSIT' as const,
+      }));
+      setTransitFleet(mapped);
     }
   };
 
-  const checkInLorry = async (transporterName: string, vehicleNumber: string, date: string, time: string) => {
+  const fetchCompletedArchives = async () => {
+    assertUnloadAccess();
+    if (materials.length === 0 || wheelTypes.length === 0 || locations.length === 0) {
+      await fetchConfigData();
+    }
+    const res = await api.getTrips('UNLOADED');
+    if (res.error) throw new Error(res.error);
+    if (res.data && res.data.trips) {
+      const mapped: UnloadVerification[] = res.data.trips.map((trip: any) => {
+        const loc = locations.find(l => Number(l.id) === Number(trip.unloadingLocationId));
+        return {
+          ...mapTripBase(trip),
+          status: 'UNLOADED' as const,
+          unloadDate: formatDateOnly(trip.unloadDate || trip.unloadEntryTime),
+          unloadEntryTime: extractTimePart(trip.unloadEntryTime),
+          unloadingLocation: loc ? loc.name : `Unload Site #${trip.unloadingLocationId}`,
+          unloadExitTime: extractTimePart(trip.unloadExitTime),
+          unloadPhoto: trip.unloadingPhotoUrl || null,
+        };
+      });
+      setCompletedArchives(mapped);
+    }
+  };
+
+  const checkInVehicle = async (transporterName: string, vehicleNumber: string, date: string, time: string) => {
     assertQuarryAccess();
     // Parse combined checkin timestamp into ISO standard format for TIMESTAMPTZ support
     const isoDateTime = `${date}T${time}:00.000Z`;
@@ -488,18 +530,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     if (res.data && res.data.trip) {
       const serverTrip = res.data.trip;
-      const newLorry: QuarryCheckIn = {
+      const newVehicle: QuarryCheckIn = {
         id: String(serverTrip.id),
         transporterName: serverTrip.transporterName,
         vehicleNumber: serverTrip.vehicleNumber,
         entryTime: Number(serverTrip.quarryEntryTime),
         status: 'INSIDE_QUARRY',
       };
-      setQuarryQueue((prev) => [...prev, newLorry]);
+      setQuarryQueue((prev) => [...prev, newVehicle]);
     }
   };
 
-  const checkOutLorry = async (
+  const checkOutVehicle = async (
     id: string,
     checkOutData: {
       exitTime: string;
@@ -511,7 +553,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       netWeight: number;
       amount: number;
       transitFormPhoto?: string;
-      lorryPhoto?: string;
+      vehiclePhoto?: string;
       gpsCoordinates: {
         latitude: number;
         longitude: number;
@@ -519,11 +561,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   ) => {
     assertQuarryAccess();
-    const lorryToCheckout = quarryQueue.find((l) => l.id === id);
-    if (!lorryToCheckout) throw new Error('Lorry not found in waiting queue');
-
+    const vehicleToCheckout = quarryQueue.find((v) => v.id === id);
+    if (!vehicleToCheckout) throw new Error('Vehicle not found in waiting queue');
+ 
     // Parse combined exit timestamp
-    const entryDate = formatDateOnly(lorryToCheckout.entryTime);
+    const entryDate = formatDateOnly(vehicleToCheckout.entryTime);
     const isoExitTime = `${entryDate}T${checkOutData.exitTime}:00.000Z`;
     const res = await api.checkOut(id, {
       transitType: checkOutData.transitType,
@@ -536,13 +578,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       userLat: checkOutData.gpsCoordinates?.latitude || 0,
       userLng: checkOutData.gpsCoordinates?.longitude || 0,
       quarryExitTime: isoExitTime,
+      transitFormPhotoUrl: checkOutData.transitFormPhoto,
+      vehiclePhotoUrl: checkOutData.vehiclePhoto,
     });
-
+ 
     if (res.error) {
       throw new Error(res.error);
     }
-
-    setQuarryQueue((prev) => prev.filter((l) => l.id !== id));
+ 
+    setQuarryQueue((prev) => prev.filter((v) => v.id !== id));
   };
 
   const verifyAndCloseTrip = async (
@@ -556,18 +600,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   ) => {
     assertUnloadAccess();
-    const lorryToVerify = transitFleet.find((l) => l.id === id);
-    if (!lorryToVerify) throw new Error('Vehicle not found in incoming fleet queue');
-
+    const vehicleToVerify = transitFleet.find((v) => v.id === id);
+    if (!vehicleToVerify) throw new Error('Vehicle not found in incoming fleet queue');
+ 
     const finalExitTime = verificationData.unloadExitTime || verificationData.unloadEntryTime;
-
+ 
     const isoUnloadEntryTime = `${verificationData.unloadDate}T${verificationData.unloadEntryTime}:00.000Z`;
     const isoUnloadExitTime = `${verificationData.unloadDate}T${finalExitTime}:00.000Z`;
-
+ 
     const selectedLoc = locations.find(l => l.id === verificationData.unloadingLocationId);
     const userLat = selectedLoc ? Number(selectedLoc.latitude) : 12.971600;
     const userLng = selectedLoc ? Number(selectedLoc.longitude) : 77.594600;
-
+ 
     const res = await api.unload(id, {
       unloadingLocationId: verificationData.unloadingLocationId,
       userLat,
@@ -575,25 +619,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       unloadEntryTime: isoUnloadEntryTime,
       unloadExitTime: isoUnloadExitTime,
       unloadDate: verificationData.unloadDate,
+      unloadingPhotoUrl: verificationData.unloadPhoto,
     });
-
+ 
     if (res.error) {
       throw new Error(res.error);
     }
-
+ 
     const unloadLocationName = selectedLoc ? selectedLoc.name : `Unload Site #${verificationData.unloadingLocationId}`;
-
+ 
     const closedTrip: UnloadVerification = {
-      ...lorryToVerify,
+      ...vehicleToVerify,
       unloadDate: verificationData.unloadDate,
       unloadEntryTime: verificationData.unloadEntryTime,
       unloadingLocation: unloadLocationName,
       unloadExitTime: finalExitTime,
-      unloadPhoto: verificationData.unloadPhoto,
+      unloadPhoto: verificationData.unloadPhoto || null,
       status: 'UNLOADED',
     };
-
-    setTransitFleet((prev) => prev.filter((l) => l.id !== id));
+ 
+    setTransitFleet((prev) => prev.filter((v) => v.id !== id));
     setCompletedArchives((prev) => [...prev, closedTrip]);
   };
 
@@ -605,15 +650,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isSuperAdmin,
         isAuthenticated,
         isLoading,
+        isPasswordRecovery,
         login,
-        signUp,
+        forgotPassword,
+        updatePassword,
         logout,
         getQuarryQueue,
         fetchQuarryQueue,
-        checkInLorry,
-        checkOutLorry,
+        checkInVehicle,
+        checkOutVehicle,
         getIncomingFleet,
-        fetchIncomingFleet,
+        fetchTransitFleet,
+        fetchCompletedArchives,
         verifyAndCloseTrip,
         getCompletedArchives,
         materials,

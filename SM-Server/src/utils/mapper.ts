@@ -23,6 +23,9 @@ export interface ClientTrip {
   unloadGpsLat?: number | null;
   unloadGpsLong?: number | null;
   unloadOperatorId?: string | null;
+  transitFormPhotoUrl?: string | null;
+  vehiclePhotoUrl?: string | null;
+  unloadingPhotoUrl?: string | null;
 }
 
 const toEpoch = (dateString: string | null | undefined): number | null => {
@@ -103,5 +106,8 @@ export function mapToClient(dbTrip: any): ClientTrip {
       ? parseFloat(dbTrip.unload_gps_long)
       : null,
     unloadOperatorId: dbTrip.unload_operator_id,
+    transitFormPhotoUrl: dbTrip.transit_form_photo_url || null,
+    vehiclePhotoUrl: dbTrip.vehicle_photo_url || null,
+    unloadingPhotoUrl: dbTrip.unloading_photo_url || null,
   };
 }

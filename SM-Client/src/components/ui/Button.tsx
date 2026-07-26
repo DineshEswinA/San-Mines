@@ -1,5 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { colors, radius, touchTarget, shadow } from '../../theme';
 
 interface ButtonProps {
   onPress: () => void;
@@ -22,107 +23,74 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
-  const getButtonStyle = () => {
-    switch (variant) {
-      case 'secondary':
-        return styles.secondaryBtn;
-      case 'danger':
-        return styles.dangerBtn;
-      case 'outline':
-        return styles.outlineBtn;
-      case 'primary':
-      default:
-        return styles.primaryBtn;
-    }
-  };
-
-  const getTextStyle = () => {
-    switch (variant) {
-      case 'outline':
-        return styles.outlineText;
-      default:
-        return styles.buttonText;
-    }
-  };
+  const variantStyle = variantStyles[variant];
 
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={onPress}
       disabled={disabled || loading}
-      style={[
-        styles.buttonBase,
-        getButtonStyle(),
-        disabled && styles.disabledBtn,
-        style,
-      ]}
+      style={[styles.base, variantStyle.container, disabled && styles.disabled, style]}
       accessibilityRole="button"
       accessibilityState={{ disabled: disabled || loading }}
     >
       {loading && (
-        <ActivityIndicator 
-          color={variant === 'outline' ? '#1E40AF' : '#FFFFFF'} 
+        <ActivityIndicator
+          color={variant === 'outline' ? '#A5B4FC' : colors.white}
           style={{ marginRight: 10 }}
         />
       )}
-      <Text style={[getTextStyle(), disabled && styles.disabledText, textStyle]}>
+      <Text style={[styles.text, variantStyle.text, textStyle]}>
         {loading ? (loadingTitle || `${title}...`) : title}
       </Text>
     </TouchableOpacity>
   );
 };
 
+const variantStyles = {
+  primary: {
+    container: { backgroundColor: colors.primary.default },
+    text: { color: colors.white },
+  },
+  secondary: {
+    container: { backgroundColor: colors.success.default },
+    text: { color: colors.white },
+  },
+  danger: {
+    container: { backgroundColor: colors.danger.default },
+    text: { color: colors.white },
+  },
+  outline: {
+    container: {
+      backgroundColor: 'rgba(99, 102, 241, 0.12)',
+      borderWidth: 1.5,
+      borderColor: '#6366F1',
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    text: { color: '#A5B4FC' },
+  },
+};
+
 const styles = StyleSheet.create({
-  buttonBase: {
-    height: 52, // Ultra-accessible touch target (> 48px)
-    borderRadius: 8,
+  base: {
+    height: touchTarget,
+    borderRadius: radius.md,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
     paddingHorizontal: 16,
     marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1.5,
-    elevation: 2,
+    ...shadow.subtle,
   },
-  primaryBtn: {
-    backgroundColor: '#1E40AF', // Enterprise Dark Blue
+  text: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
-  secondaryBtn: {
-    backgroundColor: '#16A34A', // Safety/Arrival Green
-  },
-  dangerBtn: {
-    backgroundColor: '#DC2626', // Alert Red
-  },
-  outlineBtn: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#1E40AF',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  disabledBtn: {
+  disabled: {
     opacity: 0.5,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
-  outlineText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E40AF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
-  disabledText: {
-    // Opacity on container handles visual dimming
   },
 });

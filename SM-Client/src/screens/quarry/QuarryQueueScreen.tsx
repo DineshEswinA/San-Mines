@@ -16,17 +16,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useAuth, QuarryCheckIn, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
-import { Button } from '../../components/ui/Button';
-import { Input, SegmentedControl, PickerField, DateTimeField } from '../../components/ui/Input';
-import { SearchBar } from '../../components/ui/SearchBar';
-import { CameraBox } from '../../components/ui/CameraBox';
+import { haversineDistance } from '../../utils/geo';
+
 import { Truck, Compass, CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
+import { Button, Input, SegmentedControl, PickerField, DateTimeField, SearchBar, CameraBox } from '../../components/ui';
 
 export const QuarryQueueScreen: React.FC = () => {
   const {
     getQuarryQueue,
     fetchQuarryQueue,
-    checkOutLorry,
+    checkOutVehicle,
     materials,
     wheelTypes,
     locations,
@@ -53,7 +52,7 @@ export const QuarryQueueScreen: React.FC = () => {
   });
 
   // Checkout Modal State
-  const [selectedLorry, setSelectedLorry] = useState<QuarryCheckIn | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<QuarryCheckIn | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   // Form Field States for DB config IDs
@@ -72,12 +71,13 @@ export const QuarryQueueScreen: React.FC = () => {
 
   // Camera images
   const [transitFormPhoto, setTransitFormPhoto] = useState<string | undefined>(undefined);
-  const [lorryPhoto, setLorryPhoto] = useState<string | undefined>(undefined);
+  const [vehiclePhoto, setVehiclePhoto] = useState<string | undefined>(undefined);
 
   // GPS coordinates
   const [gpsCoordinates, setGpsCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsStatusText, setGpsStatusText] = useState('Acquiring Lock...');
+  const [geofenceStatus, setGeofenceStatus] = useState<'unknown' | 'inside' | 'outside'>('unknown');
 
   // Validation errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -85,13 +85,12 @@ export const QuarryQueueScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Reload queue from context
   const loadQueue = async () => {
     setLoading(true);
     try {
       await fetchQuarryQueue();
     } catch (err: any) {
-      // In case role changes, safety boundary will throw. Handle gracefully.
+      Alert.alert('Load Failed', err.message || 'Failed to load the quarry queue. Pull down to retry.');
     } finally {
       setLoading(false);
     }
@@ -102,8 +101,8 @@ export const QuarryQueueScreen: React.FC = () => {
     try {
       await fetchQuarryQueue();
       await fetchConfigData(true);
-    } catch (err) {
-      console.error('Failed to refresh quarry queue:', err);
+    } catch {
+      // pull-to-refresh failure is visible via empty list; no alert needed
     } finally {
       setRefreshing(false);
     }
@@ -117,49 +116,59 @@ export const QuarryQueueScreen: React.FC = () => {
     }
   }, []);
 
-  // Request GPS lock on checkout trigger
   const acquireGpsLock = async (locationId?: number | null) => {
     setGpsLoading(true);
-    setGpsStatusText('Requesting Device APIs...');
+    setGpsCoordinates(null);
+    setGeofenceStatus('unknown');
+    setGpsStatusText('Requesting location permission...');
+
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
 
-      // If a location is selected, use its coordinates as fallback/mock to pass geofence
-      const targetLoc = locations.find(l => l.id === (locationId || selectedLocationId));
-      const fallbackLat = targetLoc ? Number(targetLoc.latitude) : 13.082700;
-      const fallbackLng = targetLoc ? Number(targetLoc.longitude) : 80.270700;
-
       if (status !== 'granted') {
-        setGpsCoordinates({ latitude: fallbackLat, longitude: fallbackLng });
-        setGpsStatusText('📍 GPS Lat/Long Locked via Location API (Simulated)');
+        setGpsStatusText('Location access denied. GPS permission is required to dispatch.');
         setGpsLoading(false);
         return;
       }
 
-      setGpsStatusText('Querying satellites...');
-      const location = await Location.getCurrentPositionAsync({
+      setGpsStatusText('Acquiring satellite lock...');
+      const result = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
 
-      // To pass geofencing reliably, set coordinates to the chosen quarry location's exact coords
-      setGpsCoordinates({
-        latitude: fallbackLat,
-        longitude: fallbackLng,
-      });
-      setGpsStatusText('📍 GPS Lat/Long Locked via Device API (Active Satellite)');
-    } catch (err) {
-      const targetLoc = locations.find(l => l.id === (locationId || selectedLocationId));
-      const fallbackLat = targetLoc ? Number(targetLoc.latitude) : 13.082700;
-      const fallbackLng = targetLoc ? Number(targetLoc.longitude) : 80.270700;
-      setGpsCoordinates({ latitude: fallbackLat, longitude: fallbackLng });
-      setGpsStatusText('📍 GPS Lat/Long Locked via Device API (Simulated Fallback)');
+      const { latitude, longitude } = result.coords;
+      setGpsCoordinates({ latitude, longitude });
+
+      // Check against selected quarry location boundary
+      const resolvedId = locationId ?? selectedLocationId;
+      const targetLoc = locations.find(l => Number(l.id) === Number(resolvedId));
+
+      if (targetLoc) {
+        const distanceMeters = haversineDistance(
+          latitude, longitude,
+          Number(targetLoc.latitude), Number(targetLoc.longitude)
+        );
+        const allowedRadius = Number(targetLoc.allowed_radius_meters) || 500;
+
+        if (distanceMeters <= allowedRadius) {
+          setGeofenceStatus('inside');
+          setGpsStatusText(`📍 GPS Locked — Inside Quarry Boundary (${Math.round(distanceMeters)}m from centre)`);
+        } else {
+          setGeofenceStatus('outside');
+          setGpsStatusText(`⚠️ Outside Quarry Boundary — ${Math.round(distanceMeters)}m from site centre`);
+        }
+      } else {
+        setGpsStatusText('📍 GPS Locked via Device API');
+      }
+    } catch {
+      setGpsStatusText('Failed to acquire GPS lock. Please try again before dispatching.');
     } finally {
       setGpsLoading(false);
     }
   };
 
-  const handleOpenCheckout = (lorry: QuarryCheckIn) => {
-    setSelectedLorry(lorry);
+  const handleOpenCheckout = (vehicle: QuarryCheckIn) => {
+    setSelectedVehicle(vehicle);
 
     // Auto-fill Exit Time with current local runtime
     const now = new Date();
@@ -185,8 +194,11 @@ export const QuarryQueueScreen: React.FC = () => {
     setNetWeight('');
     setAmount('');
     setTransitFormPhoto(undefined);
-    setLorryPhoto(undefined);
+    setVehiclePhoto(undefined);
     setErrors({});
+    setGeofenceStatus('unknown');
+    setGpsCoordinates(null);
+    setGpsStatusText('Acquiring Lock...');
 
     setModalVisible(true);
     acquireGpsLock(null);
@@ -204,12 +216,16 @@ export const QuarryQueueScreen: React.FC = () => {
   };
 
   const handleCheckoutSubmit = async () => {
-    if (!selectedLorry) return;
+    if (!selectedVehicle) return;
 
     const newErrors: { [key: string]: string } = {};
 
     if (!selectedLocationId) {
       newErrors.location = 'Dispatch Quarry Location is required';
+    }
+
+    if (!gpsCoordinates) {
+      newErrors.gps = 'GPS lock is required. Enable location access and wait for lock before dispatching.';
     }
 
     if (transitType === 'DIGITAL') {
@@ -235,7 +251,7 @@ export const QuarryQueueScreen: React.FC = () => {
     }
 
     const cleanAmount = amount.replace(/,/g, '');
-    if (!amount.trim() || isNaN(Number(cleanAmount)) || Number(cleanAmount) <= 0) {
+    if (amount.trim() && (isNaN(Number(cleanAmount)) || Number(cleanAmount) < 0)) {
       newErrors.amount = 'Enter a valid numeric Amount';
     }
 
@@ -249,7 +265,7 @@ export const QuarryQueueScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      await checkOutLorry(selectedLorry.id, {
+      await checkOutVehicle(selectedVehicle.id, {
         exitTime,
         transitType,
         govtStationaryNumber: transitType === 'DIGITAL' ? govtStationaryNumber.trim() : undefined,
@@ -257,23 +273,23 @@ export const QuarryQueueScreen: React.FC = () => {
         materialId: selectedMaterialId!,
         wheelTypeId: selectedWheelTypeId!,
         netWeight: Number(netWeight),
-        amount: Number(cleanAmount),
+        amount: amount.trim() ? Number(cleanAmount) : 0,
         transitFormPhoto,
-        lorryPhoto,
+        vehiclePhoto,
         gpsCoordinates,
       });
 
       setModalVisible(false);
-      setSelectedLorry(null);
+      setSelectedVehicle(null);
       await loadQueue();
 
-      Alert.alert('Dispatch Confirmed', `Vehicle ${selectedLorry.vehicleNumber} dispatched and status changed to IN_TRANSIT.`);
+      Alert.alert('Dispatch Confirmed', `Vehicle ${selectedVehicle.vehicleNumber} dispatched and status changed to IN_TRANSIT.`);
     } catch (err: any) {
       Alert.alert('Checkout Failed', err.message || 'An unexpected error occurred during dispatch.');
     }
   };
 
-  const renderLorryCard = ({ item }: { item: QuarryCheckIn }) => (
+  const renderVehicleCard = ({ item }: { item: QuarryCheckIn }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.badge}>
@@ -297,7 +313,7 @@ export const QuarryQueueScreen: React.FC = () => {
       </View>
 
       <Button
-        title="Process Quarry Check-Out"
+        title="Dispatch Vehicle"
         variant="outline"
         onPress={() => handleOpenCheckout(item)}
         style={styles.cardCheckoutBtn}
@@ -310,7 +326,7 @@ export const QuarryQueueScreen: React.FC = () => {
       <View style={styles.boardHeader}>
         <Text style={styles.boardTitle}>Quarry Waiting Yard</Text>
         <View style={styles.counterBadge}>
-          <Text style={styles.counterText}>{filteredQuarryList.length} Lorries Waiting</Text>
+          <Text style={styles.counterText}>{filteredQuarryList.length} Vehicles Waiting</Text>
         </View>
       </View>
 
@@ -356,7 +372,7 @@ export const QuarryQueueScreen: React.FC = () => {
         <FlatList
           data={filteredQuarryList}
           keyExtractor={(item) => item.id}
-          renderItem={renderLorryCard}
+          renderItem={renderVehicleCard}
           contentContainerStyle={styles.listContainer}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
@@ -365,7 +381,7 @@ export const QuarryQueueScreen: React.FC = () => {
       )}
 
       {/* Full Screen Check-Out Modal */}
-      {selectedLorry && (
+      {selectedVehicle && (
         <Modal
           animationType="slide"
           transparent={false}
@@ -379,8 +395,8 @@ export const QuarryQueueScreen: React.FC = () => {
             >
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalTitle}>Quarry Check-Out Phase</Text>
-                  <Text style={styles.modalSubtitle}>Dispatching {selectedLorry.vehicleNumber}</Text>
+                  <Text style={styles.modalTitle}>Dispatch Vehicle (Quarry Check-Out)</Text>
+                  <Text style={styles.modalSubtitle}>Dispatching {selectedVehicle.vehicleNumber}</Text>
                 </View>
                 <TouchableOpacity
                   activeOpacity={0.7}
@@ -395,7 +411,7 @@ export const QuarryQueueScreen: React.FC = () => {
                 {/* Vehicle Quick Info */}
                 <View style={styles.summaryBar}>
                   <Text style={styles.summaryText}>
-                    Transporter: <Text style={{ fontWeight: 'bold' }}>{selectedLorry.transporterName}</Text> | In: <Text style={{ fontWeight: 'bold' }}>{formatTimeTo12Hour(selectedLorry.entryTime)}</Text>
+                    Transporter: <Text style={{ fontWeight: 'bold' }}>{selectedVehicle.transporterName}</Text> | In: <Text style={{ fontWeight: 'bold' }}>{formatTimeTo12Hour(selectedVehicle.entryTime)}</Text>
                   </Text>
                 </View>
 
@@ -416,7 +432,6 @@ export const QuarryQueueScreen: React.FC = () => {
                   error={errors.location}
                   labelStyle={{ color: '#94A3B8' }}
                 />
-                {errors.location ? <Text style={styles.inlineError}>{errors.location}</Text> : null}
 
                 {/* Exit Time (Editable) */}
                 <DateTimeField
@@ -434,7 +449,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   values={['MANUAL', 'DIGITAL']}
                   selectedValue={transitType}
                   onValueChange={(val) => {
-                    setTransitType(val);
+                    setTransitType(val as 'MANUAL' | 'DIGITAL');
                     setErrors((prev) => ({ ...prev, govtStationaryNumber: '' }));
                   }}
                   labelStyle={{ color: '#94A3B8' }}
@@ -468,11 +483,10 @@ export const QuarryQueueScreen: React.FC = () => {
                   error={errors.material}
                   labelStyle={{ color: '#94A3B8' }}
                 />
-                {errors.material ? <Text style={styles.inlineError}>{errors.material}</Text> : null}
-
+ 
                 {/* Tyre Selector: Horizontal Buttons */}
                 <View style={styles.formGroup}>
-                  <Text style={styles.tyreLabel}>Lorry Tyre Configuration</Text>
+                  <Text style={styles.tyreLabel}>Vehicle Tyre Configuration</Text>
                   <View style={styles.tyreRow}>
                     {wheelTypes.map((wheel) => {
                       const isSelected = selectedWheelTypeId === wheel.id;
@@ -495,7 +509,7 @@ export const QuarryQueueScreen: React.FC = () => {
                   </View>
                   {errors.wheelType ? <Text style={styles.inlineError}>{errors.wheelType}</Text> : null}
                 </View>
-
+ 
                 {/* Net Weight and Amount */}
                 <View style={styles.row}>
                   <View style={styles.halfCol}>
@@ -518,17 +532,17 @@ export const QuarryQueueScreen: React.FC = () => {
                       onChangeText={handleAmountChange}
                       keyboardType="numeric"
                       error={errors.amount}
-                      required={true}
+                      required={false}
                       labelStyle={{ color: '#94A3B8' }}
                     />
                   </View>
                 </View>
-
+ 
                 {/* Hardware Security: Cameras */}
                 <View style={styles.cameraRow}>
                   <View style={styles.cameraCol}>
                     <CameraBox
-                      label="[Capture Transit Form]"
+                      label="Transit Form"
                       photoUri={transitFormPhoto}
                       onPhotoCaptured={setTransitFormPhoto}
                       onPhotoCleared={() => setTransitFormPhoto(undefined)}
@@ -537,33 +551,65 @@ export const QuarryQueueScreen: React.FC = () => {
                   </View>
                   <View style={styles.cameraCol}>
                     <CameraBox
-                      label="[Capture Lorry Photo]"
-                      photoUri={lorryPhoto}
-                      onPhotoCaptured={setLorryPhoto}
-                      onPhotoCleared={() => setLorryPhoto(undefined)}
+                      label="Vehicle Photo"
+                      photoUri={vehiclePhoto}
+                      onPhotoCaptured={setVehiclePhoto}
+                      onPhotoCleared={() => setVehiclePhoto(undefined)}
                     />
-                    {errors.lorryPhoto ? <Text style={styles.camError}>{errors.lorryPhoto}</Text> : null}
+                    {errors.vehiclePhoto ? <Text style={styles.camError}>{errors.vehiclePhoto}</Text> : null}
                   </View>
                 </View>
-
+ 
                 {/* Hardware Security: GPS lock */}
-                <View style={[styles.gpsReadoutBox, gpsCoordinates ? styles.gpsLocked : styles.gpsLocking]}>
-                  <Compass size={20} color={gpsCoordinates ? '#10B981' : '#F59E0B'} style={{ marginRight: 10 }} />
+                <View style={[
+                  styles.gpsReadoutBox,
+                  gpsCoordinates
+                    ? (geofenceStatus === 'outside' ? styles.gpsOutside : styles.gpsLocked)
+                    : styles.gpsLocking,
+                ]}>
+                  <Compass
+                    size={20}
+                    color={gpsCoordinates ? (geofenceStatus === 'outside' ? '#F59E0B' : '#10B981') : '#64748B'}
+                    style={{ marginRight: 10 }}
+                  />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.gpsReadoutText, gpsCoordinates ? styles.gpsTextLocked : styles.gpsTextLocking]}>
+                    <Text style={[
+                      styles.gpsReadoutText,
+                      gpsCoordinates
+                        ? (geofenceStatus === 'outside' ? styles.gpsTextOutside : styles.gpsTextLocked)
+                        : styles.gpsTextLocking,
+                    ]}>
                       {gpsStatusText}
                     </Text>
                     {gpsCoordinates && (
-                      <Text style={styles.gpsCoordinatesDetail}>
+                      <Text style={[
+                        styles.gpsCoordinatesDetail,
+                        geofenceStatus === 'outside' ? { color: '#FCD34D' } : null,
+                      ]}>
                         {gpsCoordinates.latitude.toFixed(6)}° N, {gpsCoordinates.longitude.toFixed(6)}° E
                       </Text>
                     )}
                   </View>
                 </View>
 
+                {/* Geofence violation warning banner */}
+                {geofenceStatus === 'outside' && (
+                  <View style={styles.geofenceWarningBanner}>
+                    <AlertTriangle size={16} color="#EF4444" style={{ marginRight: 8 }} />
+                    <Text style={styles.geofenceWarningText}>
+                      Trip flagged: dispatch location is outside the authorised quarry boundary. The server will validate and may reject this dispatch.
+                    </Text>
+                  </View>
+                )}
+
+                {/* GPS error if coordinates not acquired before submit */}
+                {errors.gps ? (
+                  <Text style={styles.inlineError}>{errors.gps}</Text>
+                ) : null}
+ 
                 {/* Final dispatch button */}
                 <Button
-                  title="Complete Quarry Phase & Dispatch"
+                  title="Confirm & Dispatch Vehicle"
                   loadingTitle="Dispatching..."
                   variant="secondary"
                   onPress={handleCheckoutSubmit}
@@ -585,41 +631,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0F172A',
     padding: 16,
-  },
-  filterSection: {
-    backgroundColor: '#1E293B',
-    borderWidth: 1.5,
-    borderColor: '#334155',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  searchBar: {
-    marginBottom: 8,
-  },
-  timeFilterRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  timePickerCol: {
-    flex: 1,
-    marginRight: 8,
-  },
-  clearBtn: {
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#EF4444',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  clearBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-    textTransform: 'uppercase',
   },
   boardHeader: {
     flexDirection: 'row',
@@ -862,28 +873,52 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   gpsLocking: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: '#D97706',
+    backgroundColor: 'rgba(100, 116, 139, 0.1)',
+    borderColor: '#475569',
   },
   gpsLocked: {
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderColor: '#10B981',
+  },
+  gpsOutside: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: '#D97706',
   },
   gpsReadoutText: {
     fontSize: 13,
     fontWeight: 'bold',
   },
   gpsTextLocking: {
-    color: '#F59E0B',
+    color: '#94A3B8',
   },
   gpsTextLocked: {
     color: '#34D399',
+  },
+  gpsTextOutside: {
+    color: '#FCD34D',
   },
   gpsCoordinatesDetail: {
     fontSize: 11,
     color: '#34D399',
     marginTop: 2,
     fontWeight: '600',
+  },
+  geofenceWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: '#DC2626',
+    borderWidth: 1.5,
+    borderRadius: 6,
+    padding: 10,
+    marginTop: -8,
+    marginBottom: 8,
+  },
+  geofenceWarningText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#FCA5A5',
+    lineHeight: 17,
   },
   dispatchBtn: {
     height: 54, // Large high-contrast touch target
