@@ -11,6 +11,8 @@ import {
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { OfflineProvider } from './src/context/OfflineContext';
+import { SyncStatusBanner } from './src/components/SyncStatusBanner';
 import { CheckInScreen } from './src/screens/quarry/CheckInScreen';
 import { QuarryQueueScreen } from './src/screens/quarry/QuarryQueueScreen';
 import { UnloadNavigator } from './src/navigation/UnloadNavigator';
@@ -131,6 +133,9 @@ const MainAppContent: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Offline sync status banner — field operators only */}
+      {isAuthenticated && <SyncStatusBanner />}
+
       {/* Main content area */}
       <View style={styles.body}>
         {role === 'QUARRY_OPERATOR' ? (
@@ -183,9 +188,11 @@ const MainAppContent: React.FC = () => {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <MainAppContent />
-      </AuthProvider>
+      <OfflineProvider>
+        <AuthProvider>
+          <MainAppContent />
+        </AuthProvider>
+      </OfflineProvider>
     </SafeAreaProvider>
   );
 }

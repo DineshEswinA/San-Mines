@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 // Declare global React Native __DEV__ variable for TypeScript compiler if needed
 declare const __DEV__: boolean;
 
-let API_BASE_URL = __DEV__
+export let API_BASE_URL = __DEV__
   ? (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000')
   : 'https://san-mines.vercel.app';
 
@@ -28,7 +28,7 @@ let API_BASE_URL = __DEV__
 // }
 
 // Generates dynamic Bearer auth headers reading from the active Supabase token
-const getRequestHeaders = async () => {
+export const getRequestHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session || !session.access_token) {
     throw new Error('No active session. Please log in.');

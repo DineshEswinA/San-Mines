@@ -349,7 +349,7 @@ export const MasterConfigScreen: React.FC = () => {
     try {
       const res = await api.updateWheelType(id, !currentStatus);
       if (res.error) throw new Error(res.error);
-      await fetchConfigData(true);
+      updateWheelTypeState(id, { is_active: !currentStatus });
     } catch (err: any) {
       setLocalWheelTypes((prev) =>
         prev.map((w) => (w.id === id ? { ...w, is_active: currentStatus } : w))

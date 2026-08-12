@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth, QuarryCheckOut, formatTimeTo12Hour, formatDateOnly } from '../../context/AuthContext';
 import { Truck, ShieldCheck, X } from 'lucide-react-native';
 import { SearchBar, Button, DateTimeField, PickerField, CameraBox } from '../../components/ui';
+import { Toast } from '../../components/ui/Toast';
 
 export const InTransitScreen: React.FC = () => {
   const {
@@ -54,6 +55,11 @@ export const InTransitScreen: React.FC = () => {
   const [unloadPhoto, setUnloadPhoto] = useState<string | undefined>(undefined);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Toast notification
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'live' | 'offline'>('live');
 
   const reloadData = async () => {
     setLoading(true);
@@ -109,7 +115,7 @@ export const InTransitScreen: React.FC = () => {
 
     setSubmitLoading(true);
     try {
-      await verifyAndCloseTrip(selectedVehicle.id, {
+      const result = await verifyAndCloseTrip(selectedVehicle.id, {
         unloadDate,
         unloadEntryTime,
         unloadingLocationId: selectedLocationId!,
@@ -117,12 +123,22 @@ export const InTransitScreen: React.FC = () => {
       });
       setModalVisible(false);
       setSelectedVehicle(null);
-      await reloadData();
-      Alert.alert(
-        'Trip Closed Successfully',
-        `Vehicle ${selectedVehicle.vehicleNumber} has been verified and registered to completed archives.`,
-        [{ text: 'OK' }]
-      );
+
+      if (result.status === 'LIVE_SUCCESS') {
+        await reloadData();
+        setToastMessage(`✓ Vehicle ${selectedVehicle.vehicleNumber} arrival confirmed — posted live.`);
+        setToastType('live');
+        setToastVisible(true);
+        Alert.alert(
+          'Trip Closed Successfully',
+          `Vehicle ${selectedVehicle.vehicleNumber} has been verified and registered to completed archives.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        setToastMessage(result.message ?? 'Arrival saved to device queue.');
+        setToastType('offline');
+        setToastVisible(true);
+      }
     } catch (err: any) {
       Alert.alert('Verification Failed', err.message || 'An unexpected error occurred while closing the trip.');
     } finally {
@@ -161,6 +177,12 @@ export const InTransitScreen: React.FC = () => {
           Dispatched from Quarry: <Text style={styles.footerValue}>{formatDateOnly(item.exitTime)} {formatTimeTo12Hour(item.exitTime)}</Text>
         </Text>
       </View>
+
+      {(item as any).syncStatus === 'PENDING' && (
+        <View style={styles.syncPendingBadge}>
+          <Text style={styles.syncPendingText}>🕒 Saved Locally</Text>
+        </View>
+      )}
 
       <Button
         title="Arrived: Mark Arrival"
@@ -333,6 +355,13 @@ export const InTransitScreen: React.FC = () => {
           </SafeAreaView>
         </Modal>
       )}
+
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+      />
     </View>
   );
 };
@@ -434,6 +463,21 @@ const styles = StyleSheet.create({
   arriveBtn: {
     height: 48,
     marginVertical: 0,
+  },
+  syncPendingBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(217, 119, 6, 0.15)',
+    borderColor: '#D97706',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 8,
+  },
+  syncPendingText: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: '#FCD34D',
   },
   emptyContainer: {
     flex: 1,

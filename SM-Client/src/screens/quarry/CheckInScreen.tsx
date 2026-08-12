@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 
 import { ClipboardList } from 'lucide-react-native';
 import { Input, DateTimeField, Button } from '../../components/ui';
+import { Toast } from '../../components/ui/Toast';
 
 export const CheckInScreen: React.FC = () => {
   const { checkInVehicle } = useAuth();
@@ -25,6 +26,11 @@ export const CheckInScreen: React.FC = () => {
 
   // Validation errors
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Toast notification
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'live' | 'offline'>('live');
 
   // Initialize fields with current timestamp on mount
   useEffect(() => {
@@ -76,21 +82,32 @@ export const CheckInScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      await checkInVehicle(transporterName, vehicleNumber, entryDate, entryTime);
-      Alert.alert(
-        'Check-In Successful',
-        `Vehicle ${vehicleNumber.toUpperCase()} has been registered in the waiting queue.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset non-date inputs
-              setTransporterName('');
-              setVehicleNumber('');
+      const result = await checkInVehicle(transporterName, vehicleNumber, entryDate, entryTime);
+
+      if (result.status === 'LIVE_SUCCESS') {
+        setToastMessage(`✓ Vehicle ${vehicleNumber.toUpperCase()} checked in — posted live.`);
+        setToastType('live');
+        setToastVisible(true);
+        Alert.alert(
+          'Check-In Successful',
+          `Vehicle ${vehicleNumber.toUpperCase()} has been registered in the waiting queue.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setTransporterName('');
+                setVehicleNumber('');
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      } else {
+        setToastMessage(result.message ?? 'Entry saved to device queue.');
+        setToastType('offline');
+        setToastVisible(true);
+        setTransporterName('');
+        setVehicleNumber('');
+      }
     } catch (err: any) {
       Alert.alert('Check-In Failed', err.message || 'An unexpected network error occurred.');
     } finally {
@@ -183,6 +200,13 @@ export const CheckInScreen: React.FC = () => {
           </Text>
         </View>
       </ScrollView>
+
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 };

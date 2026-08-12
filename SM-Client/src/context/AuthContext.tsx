@@ -3,6 +3,16 @@ import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatTimeTo12Hour, formatDateOnly } from '../utils/format';
+import { handleDataSubmission, type SubmissionResult } from '../services/DataService';
+import {
+  cacheQuarryTrip,
+  cacheQuarryTrips,
+  getCachedQuarryTrips,
+  removeQuarryTripFromCache,
+  cacheTransitTrips,
+  getCachedTransitTrips,
+  removeTransitCacheItem,
+} from '../db/sqlite';
 
 // Changes each time the JS bundle loads (i.e., each cold app start).
 // Used to invalidate the config cache between launches without an explicit clear.
@@ -23,6 +33,7 @@ export interface QuarryCheckIn {
   vehicleNumber: string;
   entryTime: number;
   status: 'INSIDE_QUARRY' | 'IN_TRANSIT' | 'UNLOADED';
+  syncStatus?: 'PENDING' | 'SYNCED';
 }
 
 export interface QuarryCheckOut extends Omit<QuarryCheckIn, 'status'> {
@@ -65,7 +76,7 @@ interface AuthContextType {
   // Quarry Operator specific data (Throws error if accessed by Unloading Operator)
   getQuarryQueue: () => QuarryCheckIn[];
   fetchQuarryQueue: () => Promise<void>;
-  checkInVehicle: (transporterName: string, vehicleNumber: string, date: string, time: string) => Promise<void>;
+  checkInVehicle: (transporterName: string, vehicleNumber: string, date: string, time: string) => Promise<SubmissionResult>;
   checkOutVehicle: (
     id: string,
     checkOutData: {
@@ -84,7 +95,7 @@ interface AuthContextType {
         longitude: number;
       } | null;
     }
-  ) => Promise<void>;
+  ) => Promise<SubmissionResult>;
 
   // Unload Operator specific data (Throws error if accessed by Quarry Operator)
   getIncomingFleet: () => QuarryCheckOut[];
@@ -99,7 +110,7 @@ interface AuthContextType {
       unloadExitTime?: string;
       unloadPhoto?: string;
     }
-  ) => Promise<void>;
+  ) => Promise<SubmissionResult>;
 
   // Shared / Archive (For simulation tracking/debugging or history)
   getCompletedArchives: () => UnloadVerification[];
@@ -312,6 +323,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Get initial session status on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       initializeUser(session);
+      console.log("access_token - " + session?.access_token);
+
     }).catch(() => {
       if (active) setIsLoading(false);
     });
@@ -434,19 +447,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     assertQuarryAccess();
     const res = await api.getTrips('INSIDE_QUARRY');
     if (res.error) {
-      throw new Error(res.error);
+      // Offline or server error — fall back to SQLite cache
+      try {
+        const cached = await getCachedQuarryTrips();
+        if (cached.length > 0) setQuarryQueue(cached as QuarryCheckIn[]);
+      } catch {
+        // Cache unavailable; keep current state
+      }
+      return;
     }
     if (res.data && res.data.trips) {
-      const mapped: QuarryCheckIn[] = res.data.trips.map((trip: any) => {
-        return {
-          id: String(trip.id),
-          transporterName: trip.transporterName,
-          vehicleNumber: trip.vehicleNumber,
-          entryTime: Number(trip.quarryEntryTime),
-          status: trip.status || 'INSIDE_QUARRY',
-        };
-      });
+      const mapped: QuarryCheckIn[] = res.data.trips.map((trip: any) => ({
+        id: String(trip.id),
+        transporterName: trip.transporterName,
+        vehicleNumber: trip.vehicleNumber,
+        entryTime: Number(trip.quarryEntryTime),
+        status: trip.status || 'INSIDE_QUARRY',
+      }));
       setQuarryQueue(mapped);
+      try { await cacheQuarryTrips(mapped); } catch { /* non-critical */ }
     }
   };
 
@@ -486,13 +505,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await fetchConfigData();
     }
     const res = await api.getTrips('IN_TRANSIT');
-    if (res.error) throw new Error(res.error);
+    if (res.error) {
+      // Offline or server error — fall back to SQLite cache
+      try {
+        const cached = await getCachedTransitTrips();
+        if (cached.length > 0) setTransitFleet(cached as QuarryCheckOut[]);
+      } catch {
+        // Cache unavailable; keep current state
+      }
+      return;
+    }
     if (res.data && res.data.trips) {
       const mapped: QuarryCheckOut[] = res.data.trips.map((trip: any) => ({
         ...mapTripBase(trip),
         status: 'IN_TRANSIT' as const,
       }));
       setTransitFleet(mapped);
+      try { await cacheTransitTrips(mapped); } catch { /* non-critical */ }
     }
   };
 
@@ -520,25 +549,56 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const checkInVehicle = async (transporterName: string, vehicleNumber: string, date: string, time: string) => {
+  const checkInVehicle = async (transporterName: string, vehicleNumber: string, date: string, time: string): Promise<SubmissionResult> => {
     assertQuarryAccess();
-    // Parse combined checkin timestamp into ISO standard format for TIMESTAMPTZ support
     const isoDateTime = `${date}T${time}:00.000Z`;
-    const res = await api.checkIn(vehicleNumber, transporterName, isoDateTime);
-    if (res.error) {
-      throw new Error(res.error);
-    }
-    if (res.data && res.data.trip) {
-      const serverTrip = res.data.trip;
-      const newVehicle: QuarryCheckIn = {
-        id: String(serverTrip.id),
-        transporterName: serverTrip.transporterName,
-        vehicleNumber: serverTrip.vehicleNumber,
-        entryTime: Number(serverTrip.quarryEntryTime),
+    const entryTimestamp = new Date(isoDateTime).getTime() || Date.now();
+
+    const result = await handleDataSubmission({
+      endpoint: '/api/trips/checkin',
+      method: 'POST',
+      payload: {
+        vehicleNumber: vehicleNumber.trim().toUpperCase(),
+        transporterName: transporterName.trim(),
+        quarryEntryTime: isoDateTime,
+      },
+      userRole: role,
+      localTripSnapshot: {
+        vehicle_number: vehicleNumber.trim().toUpperCase(),
+        transporter_name: transporterName.trim(),
+        entry_time: entryTimestamp,
         status: 'INSIDE_QUARRY',
+      },
+    });
+
+    if (result.status === 'LIVE_SUCCESS' && result.data?.trip) {
+      const serverTrip = result.data.trip;
+      setQuarryQueue((prev) => [
+        ...prev,
+        {
+          id: String(serverTrip.id),
+          transporterName: serverTrip.transporterName,
+          vehicleNumber: serverTrip.vehicleNumber,
+          entryTime: Number(serverTrip.quarryEntryTime),
+          status: 'INSIDE_QUARRY' as const,
+        },
+      ]);
+    } else if (result.status === 'SAVED_OFFLINE' && result.data?.localId) {
+      const offlineTrip: QuarryCheckIn = {
+        id: result.data.localId,
+        transporterName: transporterName.trim(),
+        vehicleNumber: vehicleNumber.trim().toUpperCase(),
+        entryTime: entryTimestamp,
+        status: 'INSIDE_QUARRY',
+        syncStatus: 'PENDING',
       };
-      setQuarryQueue((prev) => [...prev, newVehicle]);
+      // Add synthetic entry to queue state so the card appears immediately
+      setQuarryQueue((prev) => [...prev, offlineTrip]);
+      // Persist to SQLite quarry cache so it survives an app restart while offline
+      try { await cacheQuarryTrip(offlineTrip); } catch { /* non-critical */ }
     }
+
+    return result;
   };
 
   const checkOutVehicle = async (
@@ -559,15 +619,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         longitude: number;
       } | null;
     }
-  ) => {
+  ): Promise<SubmissionResult> => {
     assertQuarryAccess();
     const vehicleToCheckout = quarryQueue.find((v) => v.id === id);
     if (!vehicleToCheckout) throw new Error('Vehicle not found in waiting queue');
- 
-    // Parse combined exit timestamp
+
+    // Client-UUID IDs (contain '-') are locally-created trips pending server sync.
+    // We queue the checkout with a parent_local_id dependency so SyncEngine
+    // rewrites the endpoint with the real server ID before processing it.
+    const isPendingParent = id.includes('-') && vehicleToCheckout.syncStatus === 'PENDING';
+
     const entryDate = formatDateOnly(vehicleToCheckout.entryTime);
     const isoExitTime = `${entryDate}T${checkOutData.exitTime}:00.000Z`;
-    const res = await api.checkOut(id, {
+
+    const payload = {
       transitType: checkOutData.transitType,
       govtStationaryNumber: checkOutData.govtStationaryNumber,
       dispatchLocationId: checkOutData.dispatchLocationId,
@@ -580,13 +645,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       quarryExitTime: isoExitTime,
       transitFormPhotoUrl: checkOutData.transitFormPhoto,
       vehiclePhotoUrl: checkOutData.vehiclePhoto,
+    };
+
+    const result = await handleDataSubmission({
+      endpoint: `/api/trips/checkout/${id}`,
+      method: 'PUT',
+      payload,
+      userRole: role,
+      // Wire the dependency chain: if checkin was offline, checkout must wait for its sync
+      parentLocalId: isPendingParent ? id : undefined,
     });
- 
-    if (res.error) {
-      throw new Error(res.error);
+
+    if (result.status === 'LIVE_SUCCESS') {
+      setQuarryQueue((prev) => prev.filter((v) => v.id !== id));
+      try { await removeQuarryTripFromCache(id); } catch { /* non-critical */ }
     }
- 
-    setQuarryQueue((prev) => prev.filter((v) => v.id !== id));
+    // On SAVED_OFFLINE: keep the vehicle in queue so the operator can see it's pending
+
+    return result;
   };
 
   const verifyAndCloseTrip = async (
@@ -598,21 +674,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       unloadExitTime?: string;
       unloadPhoto?: string;
     }
-  ) => {
+  ): Promise<SubmissionResult> => {
     assertUnloadAccess();
     const vehicleToVerify = transitFleet.find((v) => v.id === id);
     if (!vehicleToVerify) throw new Error('Vehicle not found in incoming fleet queue');
- 
+
     const finalExitTime = verificationData.unloadExitTime || verificationData.unloadEntryTime;
- 
     const isoUnloadEntryTime = `${verificationData.unloadDate}T${verificationData.unloadEntryTime}:00.000Z`;
     const isoUnloadExitTime = `${verificationData.unloadDate}T${finalExitTime}:00.000Z`;
- 
+
     const selectedLoc = locations.find(l => l.id === verificationData.unloadingLocationId);
     const userLat = selectedLoc ? Number(selectedLoc.latitude) : 12.971600;
     const userLng = selectedLoc ? Number(selectedLoc.longitude) : 77.594600;
- 
-    const res = await api.unload(id, {
+
+    const payload = {
       unloadingLocationId: verificationData.unloadingLocationId,
       userLat,
       userLng,
@@ -620,26 +695,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       unloadExitTime: isoUnloadExitTime,
       unloadDate: verificationData.unloadDate,
       unloadingPhotoUrl: verificationData.unloadPhoto,
-    });
- 
-    if (res.error) {
-      throw new Error(res.error);
-    }
- 
-    const unloadLocationName = selectedLoc ? selectedLoc.name : `Unload Site #${verificationData.unloadingLocationId}`;
- 
-    const closedTrip: UnloadVerification = {
-      ...vehicleToVerify,
-      unloadDate: verificationData.unloadDate,
-      unloadEntryTime: verificationData.unloadEntryTime,
-      unloadingLocation: unloadLocationName,
-      unloadExitTime: finalExitTime,
-      unloadPhoto: verificationData.unloadPhoto || null,
-      status: 'UNLOADED',
     };
- 
-    setTransitFleet((prev) => prev.filter((v) => v.id !== id));
-    setCompletedArchives((prev) => [...prev, closedTrip]);
+
+    const result = await handleDataSubmission({
+      endpoint: `/api/trips/unload/${id}`,
+      method: 'PUT',
+      payload,
+      userRole: role,
+    });
+
+    if (result.status === 'LIVE_SUCCESS') {
+      const unloadLocationName = selectedLoc ? selectedLoc.name : `Unload Site #${verificationData.unloadingLocationId}`;
+      const closedTrip: UnloadVerification = {
+        ...vehicleToVerify,
+        unloadDate: verificationData.unloadDate,
+        unloadEntryTime: verificationData.unloadEntryTime,
+        unloadingLocation: unloadLocationName,
+        unloadExitTime: finalExitTime,
+        unloadPhoto: verificationData.unloadPhoto || null,
+        status: 'UNLOADED',
+      };
+      setTransitFleet((prev) => prev.filter((v) => v.id !== id));
+      setCompletedArchives((prev) => [...prev, closedTrip]);
+      try { await removeTransitCacheItem(id); } catch { /* non-critical */ }
+    }
+    // On SAVED_OFFLINE: keep vehicle in transit fleet until sync confirms closure
+
+    return result;
   };
 
   return (

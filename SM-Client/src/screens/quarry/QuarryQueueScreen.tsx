@@ -20,6 +20,7 @@ import { haversineDistance } from '../../utils/geo';
 
 import { Truck, Compass, CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
 import { Button, Input, SegmentedControl, PickerField, DateTimeField, SearchBar, CameraBox } from '../../components/ui';
+import { Toast } from '../../components/ui/Toast';
 
 export const QuarryQueueScreen: React.FC = () => {
   const {
@@ -84,6 +85,11 @@ export const QuarryQueueScreen: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Toast notification
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'live' | 'offline'>('live');
 
   const loadQueue = async () => {
     setLoading(true);
@@ -184,7 +190,8 @@ export const QuarryQueueScreen: React.FC = () => {
     setSelectedMaterial('');
     setSelectedMaterialId(null);
 
-    const defaultWheel = wheelTypes.find(w => w.wheel_count === 10) || wheelTypes[0];
+    const activeWheels = wheelTypes.filter((w) => w.is_active !== false);
+    const defaultWheel = activeWheels.find(w => w.wheel_count === 10) || activeWheels[0];
     if (defaultWheel) {
       setSelectedWheelTypeId(defaultWheel.id);
     } else {
@@ -265,7 +272,7 @@ export const QuarryQueueScreen: React.FC = () => {
     setLoading(true);
 
     try {
-      await checkOutVehicle(selectedVehicle.id, {
+      const result = await checkOutVehicle(selectedVehicle.id, {
         exitTime,
         transitType,
         govtStationaryNumber: transitType === 'DIGITAL' ? govtStationaryNumber.trim() : undefined,
@@ -281,10 +288,21 @@ export const QuarryQueueScreen: React.FC = () => {
 
       setModalVisible(false);
       setSelectedVehicle(null);
-      await loadQueue();
 
-      Alert.alert('Dispatch Confirmed', `Vehicle ${selectedVehicle.vehicleNumber} dispatched and status changed to IN_TRANSIT.`);
+      if (result.status === 'LIVE_SUCCESS') {
+        await loadQueue();
+        setToastMessage(`✓ Vehicle ${selectedVehicle.vehicleNumber} dispatched — posted live.`);
+        setToastType('live');
+        setToastVisible(true);
+        Alert.alert('Dispatch Confirmed', `Vehicle ${selectedVehicle.vehicleNumber} dispatched and status changed to IN_TRANSIT.`);
+      } else {
+        setLoading(false);
+        setToastMessage(result.message ?? 'Dispatch saved to device queue.');
+        setToastType('offline');
+        setToastVisible(true);
+      }
     } catch (err: any) {
+      setLoading(false);
       Alert.alert('Checkout Failed', err.message || 'An unexpected error occurred during dispatch.');
     }
   };
@@ -302,6 +320,12 @@ export const QuarryQueueScreen: React.FC = () => {
           </Text>
         </View>
       </View>
+
+      {item.syncStatus === 'PENDING' && (
+        <View style={styles.syncPendingBadge}>
+          <Text style={styles.syncPendingText}>🕒 Saved Locally</Text>
+        </View>
+      )}
 
       <View style={styles.cardDetails}>
         <Text style={styles.detailLabel}>
@@ -488,7 +512,7 @@ export const QuarryQueueScreen: React.FC = () => {
                 <View style={styles.formGroup}>
                   <Text style={styles.tyreLabel}>Vehicle Tyre Configuration</Text>
                   <View style={styles.tyreRow}>
-                    {wheelTypes.map((wheel) => {
+                    {wheelTypes.filter((w) => w.is_active !== false).map((wheel) => {
                       const isSelected = selectedWheelTypeId === wheel.id;
                       return (
                         <TouchableOpacity
@@ -622,6 +646,13 @@ export const QuarryQueueScreen: React.FC = () => {
           </SafeAreaView>
         </Modal>
       )}
+
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+      />
     </View>
   );
 };
@@ -714,6 +745,21 @@ const styles = StyleSheet.create({
   cardCheckoutBtn: {
     height: 48,
     marginVertical: 0,
+  },
+  syncPendingBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(217, 119, 6, 0.15)',
+    borderColor: '#D97706',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 8,
+  },
+  syncPendingText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FCD34D',
   },
   // Loader styles
   loaderContainer: {
